@@ -32,40 +32,17 @@ client.once("clientReady", () => {
   console.log(`Bot online as ${client.user.tag}`);
 });
 
-// Automatically apply Pending Review to new suggestion posts
-client.on("threadCreate", async thread => {
-  if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
+// handbook command
 
-  try {
-    const tags = [...thread.appliedTags];
+async function handbookCommand(message) {
+  await message.reply(
+    "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
+  );
+}
 
-    if (!tags.includes(PENDING_REVIEW_TAG_ID)) {
-      tags.push(PENDING_REVIEW_TAG_ID);
-    }
+// close command
 
-    await thread.setAppliedTags(
-      tags,
-      "Automatically applied Pending Review tag"
-    );
-
-    console.log(
-      `Applied Pending Review tag to: ${thread.name}`
-    );
-
-  } catch (error) {
-    console.error(
-      `Failed to automatically tag ${thread.name}:`,
-      error
-    );
-  }
-});
-
-// !close command
-client.on("messageCreate", async message => {
-  if (message.author.bot) return;
-
-  if (message.content.trim().toLowerCase() !== "!close") return;
-
+async function closeCommand(message) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
     message.member.roles.cache.has(roleId)
   );
@@ -97,12 +74,10 @@ client.on("messageCreate", async message => {
   try {
     let tags = [...thread.appliedTags];
 
-    // Remove Pending Review
     tags = tags.filter(
       tagId => tagId !== PENDING_REVIEW_TAG_ID
     );
 
-    // Add Closed
     if (!tags.includes(CLOSED_TAG_ID)) {
       tags.push(CLOSED_TAG_ID);
     }
@@ -112,7 +87,9 @@ client.on("messageCreate", async message => {
       `Closed by ${message.author.tag}`
     );
 
-    await message.reply("🔒 This post has been closed.");
+    await message.reply(
+      "🔒 This post has been closed."
+    );
 
     await thread.setLocked(
       true,
@@ -129,7 +106,10 @@ client.on("messageCreate", async message => {
     );
 
   } catch (error) {
-    console.error("Error closing forum post:", error);
+    console.error(
+      "Error closing forum post:",
+      error
+    );
 
     try {
       await message.reply(
@@ -137,6 +117,52 @@ client.on("messageCreate", async message => {
       );
     } catch {}
   }
+}
+
+
+client.on("threadCreate", async thread => {
+  if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
+
+  try {
+    const tags = [...thread.appliedTags];
+
+    if (!tags.includes(PENDING_REVIEW_TAG_ID)) {
+      tags.push(PENDING_REVIEW_TAG_ID);
+    }
+
+    await thread.setAppliedTags(
+      tags,
+      "Automatically applied Pending Review tag"
+    );
+
+    console.log(
+      `Applied Pending Review tag to: ${thread.name}`
+    );
+
+  } catch (error) {
+    console.error(
+      `Failed to automatically tag ${thread.name}:`,
+      error
+    );
+  }
 });
+
+
+client.on("messageCreate", async message => {
+  if (message.author.bot) return;
+
+  const command = message.content
+    .trim()
+    .toLowerCase();
+
+  if (command === "!handbook") {
+    return handbookCommand(message);
+  }
+
+  if (command === "!close") {
+    return closeCommand(message);
+  }
+});
+
 
 client.login(TOKEN);
