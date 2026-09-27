@@ -29,7 +29,7 @@ const client = new Client({
 });
 
 client.once("clientReady", () => {
-  console.log("Bot online as ${client.user.tag}");
+  console.log(`Bot online as ${client.user.tag}`);
 });
 
 
@@ -88,7 +88,9 @@ async function formatCommand(message: { reference: { messageId: any; }; reply: (
 
 // close command
 
-async function closeCommand(message: { member: { roles: { cache: { has: (arg0: string) => unknown; }; }; permissions: { has: (arg0: any) => any; }; }; reply: (arg0: string) => any; channel: any; }) {
+async function closeCommand(message: {
+  author: any; member: { roles: { cache: { has: (arg0: string) => unknown; }; }; permissions: { has: (arg0: any) => any; }; }; reply: (arg0: string) => any; channel: any; 
+}) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
     message.member.roles.cache.has(roleId)
   );
@@ -139,12 +141,12 @@ async function closeCommand(message: { member: { roles: { cache: { has: (arg0: s
 
     await thread.setLocked(
       true,
-      "Closed by ${message.author.tag}"
+      `Closed by ${message.author.tag}`
     );
 
     await thread.setArchived(
       true,
-      "Closed by ${message.author.tag}"
+      `Closed by ${message.author.tag}`
     );
 
     console.log(
@@ -167,7 +169,9 @@ async function closeCommand(message: { member: { roles: { cache: { has: (arg0: s
 
 // apply pending review
 
-client.on("threadCreate", async (thread: { parentId: string; appliedTags: any; setAppliedTags: (arg0: any[], arg1: string) => any; }) => {
+client.on("threadCreate", async (thread: {
+  name: any; parentId: string; appliedTags: any; setAppliedTags: (arg0: any[], arg1: string) => any; 
+}) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
   try {
@@ -183,12 +187,12 @@ client.on("threadCreate", async (thread: { parentId: string; appliedTags: any; s
     );
 
     console.log(
-      "Applied Pending Review tag to: ${thread.name}"
+      `Applied Pending Review tag to: ${thread.name}`
     );
 
   } catch (error) {
     console.error(
-      "Failed to automatically tag ${thread.name}:",
+      `Failed to automatically tag ${thread.name}:`,
       error
     );
   }
