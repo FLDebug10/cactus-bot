@@ -29,13 +29,13 @@ const client = new Client({
 });
 
 client.once("clientReady", () => {
-  console.log(Bot online as ${client.user.tag});
+  console.log("Bot online as ${client.user.tag}");
 });
 
 
 // handbook command
 
-async function handbookCommand(message) {
+async function handbookCommand(message: { reply: (arg0: string) => any; }) {
   await message.reply(
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
   );
@@ -44,7 +44,7 @@ async function handbookCommand(message) {
 
 // format command
 
-async function formatCommand(message) {
+async function formatCommand(message: { reference: { messageId: any; }; reply: (arg0: string) => any; channel: { messages: { fetch: (arg0: any) => any; }; }; }) {
   if (!message.reference?.messageId) {
     return message.reply(
       "❌ Reply to a message containing JSON, then use !format."
@@ -88,7 +88,7 @@ async function formatCommand(message) {
 
 // close command
 
-async function closeCommand(message) {
+async function closeCommand(message: { member: { roles: { cache: { has: (arg0: string) => unknown; }; }; permissions: { has: (arg0: any) => any; }; }; reply: (arg0: string) => any; channel: any; }) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
     message.member.roles.cache.has(roleId)
   );
@@ -130,7 +130,7 @@ async function closeCommand(message) {
 
     await thread.setAppliedTags(
       tags,
-      Closed by ${message.author.tag}
+      "Closed by ${message.author.tag}"
     );
 
     await message.reply(
@@ -139,16 +139,16 @@ async function closeCommand(message) {
 
     await thread.setLocked(
       true,
-      Closed by ${message.author.tag}
+      "Closed by ${message.author.tag}"
     );
 
     await thread.setArchived(
       true,
-      Closed by ${message.author.tag}
+      "Closed by ${message.author.tag}"
     );
 
     console.log(
-      ${message.author.tag} closed forum post: ${thread.name}
+      "${message.author.tag} closed forum post: ${thread.name}"
     );
 
   } catch (error) {
@@ -167,7 +167,7 @@ async function closeCommand(message) {
 
 // apply pending review
 
-client.on("threadCreate", async thread => {
+client.on("threadCreate", async (thread: { parentId: string; appliedTags: any; setAppliedTags: (arg0: any[], arg1: string) => any; }) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
   try {
@@ -183,19 +183,19 @@ client.on("threadCreate", async thread => {
     );
 
     console.log(
-      Applied Pending Review tag to: ${thread.name}
+      "Applied Pending Review tag to: ${thread.name}"
     );
 
   } catch (error) {
     console.error(
-      Failed to automatically tag ${thread.name}:,
+      "Failed to automatically tag ${thread.name}:",
       error
     );
   }
 });
 
 
-client.on("messageCreate", async message => {
+client.on("messageCreate", async (message: any) => {
   if (message.author.bot) return;
 
   const command = message.content
