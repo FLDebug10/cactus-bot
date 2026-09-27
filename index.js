@@ -32,6 +32,7 @@ client.once("clientReady", () => {
   console.log(`Bot online as ${client.user.tag}`);
 });
 
+
 // handbook command
 
 async function handbookCommand(message) {
@@ -39,6 +40,51 @@ async function handbookCommand(message) {
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
   );
 }
+
+
+// format command
+
+async function formatCommand(message) {
+  if (!message.reference?.messageId) {
+    return message.reply(
+      "❌ Reply to a message containing JSON, then use `!format`."
+    );
+  }
+
+  try {
+    const repliedMessage = await message.channel.messages.fetch(
+      message.reference.messageId
+    );
+
+    let content = repliedMessage.content.trim();
+
+    if (content.startsWith("```") && content.endsWith("```")) {
+      content = content
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, "")
+        .trim();
+    }
+
+    const parsed = JSON.parse(content);
+    const formatted = JSON.stringify(parsed, null, 2);
+
+    if (formatted.length > 1900) {
+      return message.reply(
+        "❌ The formatted JSON is too long to send in one Discord message."
+      );
+    }
+
+    return message.reply(
+      `\`\`\`json\n${formatted}\n\`\`\``
+    );
+
+  } catch (error) {
+    return message.reply(
+      "❌ That message does not contain valid JSON."
+    );
+  }
+}
+
 
 // close command
 
@@ -119,6 +165,7 @@ async function closeCommand(message) {
   }
 }
 
+// apply pending review
 
 client.on("threadCreate", async thread => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
@@ -157,6 +204,10 @@ client.on("messageCreate", async message => {
 
   if (command === "!handbook") {
     return handbookCommand(message);
+  }
+
+  if (command === "!format") {
+    return formatCommand(message);
   }
 
   if (command === "!close") {
