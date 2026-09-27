@@ -15,9 +15,4 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH }}
           script: |
-            cd /home/cactus-bot/bot
-            git pull
-            npm install
-            sudo systemctl restart discordbot
-            sleep 2
-            sudo systemctl status discordbot --no-pager
+            ~deploy.sh
