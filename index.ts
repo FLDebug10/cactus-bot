@@ -44,7 +44,11 @@ async function handbookCommand(message: { reply: (arg0: string) => any; }) {
 
 // format command
 
-async function formatCommand(message: { reference: { messageId: any; }; reply: (arg0: string) => any; channel: { messages: { fetch: (arg0: any) => any; }; }; }) {
+async function formatCommand(message: {
+  reference: { messageId: any; };
+  reply: (arg0: string) => any;
+  channel: { messages: { fetch: (arg0: any) => any; }; };
+}) {
   if (!message.reference?.messageId) {
     return message.reply(
       "❌ Reply to a message containing JSON, then use !format."
@@ -86,10 +90,51 @@ async function formatCommand(message: { reference: { messageId: any; }; reply: (
 }
 
 
+// escape command
+
+async function escapeCommand(message: any) {
+  const content = message.content.trim();
+
+  const commandText = content.slice("!escape".length).trim();
+
+  if (!commandText) {
+    return message.reply(
+      "❌ Put a command after `!escape`."
+    );
+  }
+
+  const escaped = commandText
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
+
+  if (escaped.length > 1900) {
+    return message.reply(
+      "❌ The escaped command is too long to send in one Discord message."
+    );
+  }
+
+  return message.reply(
+    `\`\`\`\n${escaped}\n\`\`\``
+  );
+}
+
+
 // close command
 
 async function closeCommand(message: {
-  author: any; member: { roles: { cache: { has: (arg0: string) => unknown; }; }; permissions: { has: (arg0: any) => any; }; }; reply: (arg0: string) => any; channel: any; 
+  author: any;
+  member: {
+    roles: {
+      cache: {
+        has: (arg0: string) => unknown;
+      };
+    };
+    permissions: {
+      has: (arg0: any) => any;
+    };
+  };
+  reply: (arg0: string) => any;
+  channel: any;
 }) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
     message.member.roles.cache.has(roleId)
@@ -132,7 +177,7 @@ async function closeCommand(message: {
 
     await thread.setAppliedTags(
       tags,
-      "Closed by ${message.author.tag}"
+      `Closed by ${message.author.tag}`
     );
 
     await message.reply(
@@ -150,7 +195,7 @@ async function closeCommand(message: {
     );
 
     console.log(
-      "${message.author.tag} closed forum post: ${thread.name}"
+      `${message.author.tag} closed forum post: ${thread.name}`
     );
 
   } catch (error) {
@@ -167,10 +212,11 @@ async function closeCommand(message: {
   }
 }
 
-// apply pending review
-
 client.on("threadCreate", async (thread: {
-  name: any; parentId: string; appliedTags: any; setAppliedTags: (arg0: any[], arg1: string) => any; 
+  name: any;
+  parentId: string;
+  appliedTags: any;
+  setAppliedTags: (arg0: any[], arg1: string) => any;
 }) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
@@ -198,7 +244,6 @@ client.on("threadCreate", async (thread: {
   }
 });
 
-
 client.on("messageCreate", async (message: any) => {
   if (message.author.bot) return;
 
@@ -216,6 +261,10 @@ client.on("messageCreate", async (message: any) => {
 
   if (command === "!close") {
     return closeCommand(message);
+  }
+
+  if (command === "!escape" || command.startsWith("!escape ")) {
+    return escapeCommand(message);
   }
 });
 
