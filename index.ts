@@ -1,18 +1,13 @@
-import "dotenv/config";
+require('dotenv').config();
 
-import {
+const {
   Client,
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
-  type Message,
-} from "discord.js";
+} = require("discord.js");
 
 const TOKEN = process.env.TOKEN;
-
-if (!TOKEN) {
-  throw new Error("TOKEN is missing from your .env file.");
-}
 
 const CLOSED_TAG_ID = "1553708235582869604";
 const PENDING_REVIEW_TAG_ID = "1553812865071186000";
@@ -22,7 +17,7 @@ const SUGGESTIONS_FORUM_ID = "1533408806833229834";
 const ALLOWED_ROLE_IDS = [
   "1531431940178317385",
   "1547964808912048299",
-  "1548817360247332874",
+  "1548817360247332874"
 ];
 
 const client = new Client({
@@ -34,13 +29,13 @@ const client = new Client({
 });
 
 client.once("clientReady", () => {
-  console.log(`Bot online as ${client.user.tag}`);
+  console.log(Bot online as ${client.user.tag});
 });
 
 
 // handbook command
 
-async function handbookCommand(message: Message): Promise<void> {
+async function handbookCommand(message) {
   await message.reply(
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
   );
@@ -49,16 +44,11 @@ async function handbookCommand(message: Message): Promise<void> {
 
 // format command
 
-async function formatCommand(message: Message): Promise<void> {
+async function formatCommand(message) {
   if (!message.reference?.messageId) {
-    await message.reply(
-      "❌ Reply to a message containing JSON, then use `!format`."
+    return message.reply(
+      "❌ Reply to a message containing JSON, then use !format."
     );
-    return;
-  }
-
-  if (!message.channel.isTextBased()) {
-    return;
   }
 
   try {
@@ -75,22 +65,21 @@ async function formatCommand(message: Message): Promise<void> {
         .trim();
     }
 
-    const parsed: unknown = JSON.parse(content);
+    const parsed = JSON.parse(content);
     const formatted = JSON.stringify(parsed, null, 2);
 
     if (formatted.length > 1900) {
-      await message.reply(
+      return message.reply(
         "❌ The formatted JSON is too long to send in one Discord message."
       );
-      return;
     }
 
-    await message.reply(
+    return message.reply(
       `\`\`\`json\n${formatted}\n\`\`\``
     );
 
-  } catch {
-    await message.reply(
+  } catch (error) {
+    return message.reply(
       "❌ That message does not contain valid JSON."
     );
   }
@@ -99,13 +88,9 @@ async function formatCommand(message: Message): Promise<void> {
 
 // close command
 
-async function closeCommand(message: Message): Promise<void> {
-  if (!message.member) {
-    return;
-  }
-
+async function closeCommand(message) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
-    message.member!.roles.cache.has(roleId)
+    message.member.roles.cache.has(roleId)
   );
 
   const isModerator = message.member.permissions.has(
@@ -113,26 +98,23 @@ async function closeCommand(message: Message): Promise<void> {
   );
 
   if (!isModerator && !hasAllowedRole) {
-    await message.reply(
+    return message.reply(
       "❌ You do not have permission to close forum posts."
     );
-    return;
   }
 
   const thread = message.channel;
 
   if (!thread.isThread()) {
-    await message.reply(
+    return message.reply(
       "❌ This command can only be used inside a forum post."
     );
-    return;
   }
 
   if (!thread.parent || thread.parent.type !== ChannelType.GuildForum) {
-    await message.reply(
+    return message.reply(
       "❌ This command can only be used inside a forum post."
     );
-    return;
   }
 
   try {
@@ -148,7 +130,7 @@ async function closeCommand(message: Message): Promise<void> {
 
     await thread.setAppliedTags(
       tags,
-      `Closed by ${message.author.tag}`
+      Closed by ${message.author.tag}
     );
 
     await message.reply(
@@ -157,16 +139,16 @@ async function closeCommand(message: Message): Promise<void> {
 
     await thread.setLocked(
       true,
-      `Closed by ${message.author.tag}`
+      Closed by ${message.author.tag}
     );
 
     await thread.setArchived(
       true,
-      `Closed by ${message.author.tag}`
+      Closed by ${message.author.tag}
     );
 
     console.log(
-      `${message.author.tag} closed forum post: ${thread.name}`
+      ${message.author.tag} closed forum post: ${thread.name}
     );
 
   } catch (error) {
@@ -179,16 +161,14 @@ async function closeCommand(message: Message): Promise<void> {
       await message.reply(
         "❌ I couldn't close this forum post. Check my permissions and the forum tags."
       );
-    } catch {
-    }
+    } catch {}
   }
 }
 
+// apply pending review
 
 client.on("threadCreate", async thread => {
-  if (thread.parentId !== SUGGESTIONS_FORUM_ID) {
-    return;
-  }
+  if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
   try {
     const tags = [...thread.appliedTags];
@@ -203,39 +183,35 @@ client.on("threadCreate", async thread => {
     );
 
     console.log(
-      `Applied Pending Review tag to: ${thread.name}`
+      Applied Pending Review tag to: ${thread.name}
     );
 
   } catch (error) {
     console.error(
-      `Failed to automatically tag ${thread.name}:`,
+      Failed to automatically tag ${thread.name}:,
       error
     );
   }
 });
 
+
 client.on("messageCreate", async message => {
-  if (message.author.bot) {
-    return;
-  }
+  if (message.author.bot) return;
 
   const command = message.content
     .trim()
     .toLowerCase();
 
   if (command === "!handbook") {
-    await handbookCommand(message);
-    return;
+    return handbookCommand(message);
   }
 
   if (command === "!format") {
-    await formatCommand(message);
-    return;
+    return formatCommand(message);
   }
 
   if (command === "!close") {
-    await closeCommand(message);
-    return;
+    return closeCommand(message);
   }
 });
 
