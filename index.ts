@@ -1,13 +1,18 @@
-require('dotenv').config();
+import "dotenv/config";
 
-const {
+import {
   Client,
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
-} = require("discord.js");
+  type Message,
+} from "discord.js";
 
 const TOKEN = process.env.TOKEN;
+
+if (!TOKEN) {
+  throw new Error("TOKEN is missing from your .env file.");
+}
 
 const CLOSED_TAG_ID = "1553708235582869604";
 const PENDING_REVIEW_TAG_ID = "1553812865071186000";
@@ -17,7 +22,7 @@ const SUGGESTIONS_FORUM_ID = "1533408806833229834";
 const ALLOWED_ROLE_IDS = [
   "1531431940178317385",
   "1547964808912048299",
-  "1548817360247332874"
+  "1548817360247332874",
 ];
 
 const client = new Client({
@@ -35,7 +40,7 @@ client.once("clientReady", () => {
 
 // handbook command
 
-async function handbookCommand(message) {
+async function handbookCommand(message: Message): Promise<void> {
   await message.reply(
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
   );
@@ -44,11 +49,16 @@ async function handbookCommand(message) {
 
 // format command
 
-async function formatCommand(message) {
+async function formatCommand(message: Message): Promise<void> {
   if (!message.reference?.messageId) {
-    return message.reply(
+    await message.reply(
       "❌ Reply to a message containing JSON, then use `!format`."
     );
+    return;
+  }
+
+  if (!message.channel.isTextBased()) {
+    return;
   }
 
   try {
@@ -65,21 +75,22 @@ async function formatCommand(message) {
         .trim();
     }
 
-    const parsed = JSON.parse(content);
+    const parsed: unknown = JSON.parse(content);
     const formatted = JSON.stringify(parsed, null, 2);
 
     if (formatted.length > 1900) {
-      return message.reply(
+      await message.reply(
         "❌ The formatted JSON is too long to send in one Discord message."
       );
+      return;
     }
 
-    return message.reply(
+    await message.reply(
       `\`\`\`json\n${formatted}\n\`\`\``
     );
 
-  } catch (error) {
-    return message.reply(
+  } catch {
+    await message.reply(
       "❌ That message does not contain valid JSON."
     );
   }
@@ -88,9 +99,13 @@ async function formatCommand(message) {
 
 // close command
 
-async function closeCommand(message) {
+async function closeCommand(message: Message): Promise<void> {
+  if (!message.member) {
+    return;
+  }
+
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
-    message.member.roles.cache.has(roleId)
+    message.member!.roles.cache.has(roleId)
   );
 
   const isModerator = message.member.permissions.has(
@@ -98,23 +113,26 @@ async function closeCommand(message) {
   );
 
   if (!isModerator && !hasAllowedRole) {
-    return message.reply(
+    await message.reply(
       "❌ You do not have permission to close forum posts."
     );
+    return;
   }
 
   const thread = message.channel;
 
   if (!thread.isThread()) {
-    return message.reply(
+    await message.reply(
       "❌ This command can only be used inside a forum post."
     );
+    return;
   }
 
   if (!thread.parent || thread.parent.type !== ChannelType.GuildForum) {
-    return message.reply(
+    await message.reply(
       "❌ This command can only be used inside a forum post."
     );
+    return;
   }
 
   try {
@@ -161,14 +179,16 @@ async function closeCommand(message) {
       await message.reply(
         "❌ I couldn't close this forum post. Check my permissions and the forum tags."
       );
-    } catch {}
+    } catch {
+    }
   }
 }
 
-// apply pending review
 
 client.on("threadCreate", async thread => {
-  if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
+  if (thread.parentId !== SUGGESTIONS_FORUM_ID) {
+    return;
+  }
 
   try {
     const tags = [...thread.appliedTags];
@@ -194,24 +214,28 @@ client.on("threadCreate", async thread => {
   }
 });
 
-
 client.on("messageCreate", async message => {
-  if (message.author.bot) return;
+  if (message.author.bot) {
+    return;
+  }
 
   const command = message.content
     .trim()
     .toLowerCase();
 
   if (command === "!handbook") {
-    return handbookCommand(message);
+    await handbookCommand(message);
+    return;
   }
 
   if (command === "!format") {
-    return formatCommand(message);
+    await formatCommand(message);
+    return;
   }
 
   if (command === "!close") {
-    return closeCommand(message);
+    await closeCommand(message);
+    return;
   }
 });
 
