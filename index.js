@@ -1,0 +1,104 @@
+require('dotenv').config();
+
+const {
+  Client,
+  GatewayIntentBits,
+  PermissionFlagsBits,
+  ChannelType,
+} = require("discord.js");
+
+const TOKEN = process.env.TOKEN;
+
+const CLOSED_TAG_ID = "1553708235582869604";
+
+const ALLOWED_ROLE_IDS = [
+  "1531431940178317385",
+  "1547964808912048299",
+  "1548817360247332874"
+];
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
+
+client.once("clientReady", () => {
+  console.log(`Bot online as ${client.user.tag}`);
+});
+
+client.on("messageCreate", async message => {
+  if (message.author.bot) return;
+
+  if (message.content.trim().toLowerCase() !== "!close") return;
+
+  const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
+    message.member.roles.cache.has(roleId)
+  );
+
+  const isModerator = message.member.permissions.has(
+    PermissionFlagsBits.ManageThreads
+  );
+
+  if (!isModerator && !hasAllowedRole) {
+    return message.reply(
+      "❌ You do not have permission to close forum posts."
+    );
+  }
+
+  const thread = message.channel;
+
+  if (!thread.isThread()) {
+    return message.reply(
+      "❌ This command can only be used inside a forum post."
+    );
+  }
+
+  if (!thread.parent || thread.parent.type !== ChannelType.GuildForum) {
+    return message.reply(
+      "❌ This command can only be used inside a forum post."
+    );
+  }
+
+  try {
+    const tags = [...thread.appliedTags];
+
+    if (!tags.includes(CLOSED_TAG_ID)) {
+      tags.push(CLOSED_TAG_ID);
+    }
+
+    await thread.setAppliedTags(
+      tags,
+      `Closed by ${message.author.tag}`
+    );
+
+    await message.reply("🔒 This post has been closed.");
+
+    await thread.setLocked(
+      true,
+      `Closed by ${message.author.tag}`
+    );
+
+    await thread.setArchived(
+      true,
+      `Closed by ${message.author.tag}`
+    );
+
+    console.log(
+      `${message.author.tag} closed forum post: ${thread.name}`
+    );
+
+  } catch (error) {
+    console.error("Error closing forum post:", error);
+
+    try {
+      await message.reply(
+        "❌ I couldn't close this forum post. Check my permissions and the forum tag."
+      );
+    } catch {}
+  }
+});
+
+client.login(TOKEN);
