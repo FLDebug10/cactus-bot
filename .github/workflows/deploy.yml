@@ -1,0 +1,23 @@
+name: Deploy Bot
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH }}
+          script: |
+            cd /home/cactus-bot/bot
+            git pull
+            npm install
+            sudo systemctl restart discordbot
+            sleep 2
+            sudo systemctl status discordbot --no-pager
