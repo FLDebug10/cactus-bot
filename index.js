@@ -10,6 +10,9 @@ const {
 const TOKEN = process.env.TOKEN;
 
 const CLOSED_TAG_ID = "1553708235582869604";
+const PENDING_REVIEW_TAG_ID = "1553812865071186000";
+
+const SUGGESTIONS_FORUM_ID = "1533408806833229834";
 
 const ALLOWED_ROLE_IDS = [
   "1531431940178317385",
@@ -29,6 +32,35 @@ client.once("clientReady", () => {
   console.log(`Bot online as ${client.user.tag}`);
 });
 
+// Automatically apply Pending Review to new suggestion posts
+client.on("threadCreate", async thread => {
+  if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
+
+  try {
+    const tags = [...thread.appliedTags];
+
+    if (!tags.includes(PENDING_REVIEW_TAG_ID)) {
+      tags.push(PENDING_REVIEW_TAG_ID);
+    }
+
+    await thread.setAppliedTags(
+      tags,
+      "Automatically applied Pending Review tag"
+    );
+
+    console.log(
+      `Applied Pending Review tag to: ${thread.name}`
+    );
+
+  } catch (error) {
+    console.error(
+      `Failed to automatically tag ${thread.name}:`,
+      error
+    );
+  }
+});
+
+// !close command
 client.on("messageCreate", async message => {
   if (message.author.bot) return;
 
@@ -63,8 +95,14 @@ client.on("messageCreate", async message => {
   }
 
   try {
-    const tags = [...thread.appliedTags];
+    let tags = [...thread.appliedTags];
 
+    // Remove Pending Review
+    tags = tags.filter(
+      tagId => tagId !== PENDING_REVIEW_TAG_ID
+    );
+
+    // Add Closed
     if (!tags.includes(CLOSED_TAG_ID)) {
       tags.push(CLOSED_TAG_ID);
     }
@@ -95,7 +133,7 @@ client.on("messageCreate", async message => {
 
     try {
       await message.reply(
-        "❌ I couldn't close this forum post. Check my permissions and the forum tag."
+        "❌ I couldn't close this forum post. Check my permissions and the forum tags."
       );
     } catch {}
   }
