@@ -94,3 +94,11 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH }}
+          script: |
+            docker compose -f ./fabians-komische-coding-prjekte/cactus-bot/docker-compose.yaml down && docker compose -f ./fabians-komische-coding-prjekte/cactus-bot/docker-compose.yaml pull && docker compose -f ./fabians-komische-coding-prjekte/cactus-bot/docker-compose.yaml up -d
