@@ -101,4 +101,4 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH }}
           script: |
-            docker compose -C ~/bot/ down && docker compose -C ~/bot/ pull && docker compose -C ~/bot/ up -d
+            docker-compose -f ~/bot/docker-compose.yaml down && docker-compose -f ~/bot/docker-compose.yaml pull && docker-compose -f ~/bot/docker-compose.yaml up -d
