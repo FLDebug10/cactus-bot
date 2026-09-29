@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { data, getTableAsMap } from "./db";
+import { data, getTableAsMap } from "./db.ts";
 import {
   Client,
   GatewayIntentBits,
