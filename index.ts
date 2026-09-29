@@ -5,6 +5,7 @@ const {
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
+  Partials,
 } = require("discord.js");
 
 const TOKEN = process.env.TOKEN;
@@ -14,6 +15,7 @@ const CLAIMED_TAG_ID = "1553708304860057620";
 const PENDING_REVIEW_TAG_ID = "1553812865071186000";
 
 const SUGGESTIONS_FORUM_ID = "1533408806833229834";
+const MODMAIL_FORUM_ID = "1554472572647768064";
 
 const ALLOWED_ROLE_IDS = [
   "1531431940178317385",
@@ -23,11 +25,20 @@ const ALLOWED_ROLE_IDS = [
 
 const claimedPosts = new Map<string, string>();
 
+const modmailUsers = new Map<string, string>();
+
+const modmailThreads = new Map<string, string>();
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+
+  partials: [
+    Partials.Channel,
   ],
 });
 
@@ -53,9 +64,10 @@ async function helpCommand(message: any) {
 - \`!handbook\` — Sends the Overgrown Handbook link
 - \`!claim\` — Claims a suggestion post and marks it as being handled
 - \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
+- \`!closemail\` — Closes the current Modmail conversation
 
 🔒 **Contributor / Staff Commands**
-Some commands, such as \`!claim\` and \`!close\`, are restricted to Contributors and staff.`
+Some commands, such as \`!claim\`, \`!close\`, and \`!closemail\`, are restricted to Contributors and staff.`
   );
 }
 
@@ -198,7 +210,6 @@ async function claimCommand(message: any) {
       tagId => tagId !== PENDING_REVIEW_TAG_ID
     );
 
-    // Add Claimed
     if (!tags.includes(CLAIMED_TAG_ID)) {
       tags.push(CLAIMED_TAG_ID);
     }
@@ -207,7 +218,7 @@ async function claimCommand(message: any) {
       tags,
       `Claimed by ${message.author.tag}`
     );
-    
+
     if (!thread.name.startsWith("[CLAIMED] ")) {
       await thread.setName(
         `[CLAIMED] ${thread.name}`,
@@ -239,21 +250,7 @@ async function claimCommand(message: any) {
 
 // close command
 
-async function closeCommand(message: {
-  author: any;
-  member: {
-    roles: {
-      cache: {
-        has: (arg0: string) => unknown;
-      };
-    };
-    permissions: {
-      has: (arg0: any) => any;
-    };
-  };
-  reply: (arg0: string) => any;
-  channel: any;
-}) {
+async function closeCommand(message: any) {
   const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
     message.member.roles.cache.has(roleId)
   );
@@ -341,12 +338,68 @@ async function closeCommand(message: {
   }
 }
 
-client.on("threadCreate", async (thread: {
-  name: any;
-  parentId: string;
-  appliedTags: any;
-  setAppliedTags: (arg0: any[], arg1: string) => any;
-}) => {
+async function closeMailCommand(message: any) {
+  const thread = message.channel;
+
+  if (!thread.isThread()) {
+    return message.reply(
+      "❌ This command can only be used inside a Modmail post."
+    );
+  }
+
+  if (thread.parentId !== MODMAIL_FORUM_ID) {
+    return message.reply(
+      "❌ This is not a Modmail post."
+    );
+  }
+
+  const userId = modmailThreads.get(thread.id);
+
+  if (!userId) {
+    return message.reply(
+      "❌ I couldn't find the user attached to this Modmail conversation."
+    );
+  }
+
+  try {
+    const user = await client.users.fetch(userId);
+
+    try {
+      await user.send(
+        "📪 Your Modmail conversation has been closed by the staff team."
+      );
+    } catch {}
+
+    modmailThreads.delete(thread.id);
+    modmailUsers.delete(userId);
+
+    await message.reply(
+      "📪 Modmail conversation closed."
+    );
+
+    await thread.setLocked(
+      true,
+      `Modmail closed by ${message.author.tag}`
+    );
+
+    await thread.setArchived(
+      true,
+      `Modmail closed by ${message.author.tag}`
+    );
+
+  } catch (error) {
+    console.error(
+      "Error closing Modmail:",
+      error
+    );
+
+    return message.reply(
+      "❌ I couldn't close this Modmail conversation."
+    );
+  }
+}
+
+client.on("threadCreate", async (thread: any) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
   try {
@@ -373,11 +426,137 @@ client.on("threadCreate", async (thread: {
   }
 });
 
-
-// command listener
-
 client.on("messageCreate", async (message: any) => {
   if (message.author.bot) return;
+
+  if (message.channel.type === ChannelType.DM) {
+    try {
+      const forum = await client.channels.fetch(MODMAIL_FORUM_ID);
+
+      if (!forum || forum.type !== ChannelType.GuildForum) {
+        console.error("Modmail forum was not found.");
+        return;
+      }
+
+      let threadId = modmailUsers.get(message.author.id);
+      let thread: any = null;
+
+      if (threadId) {
+        try {
+          thread = await client.channels.fetch(threadId);
+        } catch {
+          thread = null;
+        }
+      }
+
+      if (!thread) {
+        const safeName = message.author.username
+          .replace(/[^a-zA-Z0-9-_]/g, "-")
+          .slice(0, 70);
+
+        thread = await forum.threads.create({
+          name: `[OPEN] ${safeName}`,
+          message: {
+            content:
+              `📬 **New Modmail Conversation**\n` +
+              `**User:** ${message.author}\n` +
+              `**Username:** ${message.author.tag}\n` +
+              `**User ID:** \`${message.author.id}\`\n\n` +
+              `Reply normally in this thread to message the user.`
+          }
+        });
+
+        modmailUsers.set(
+          message.author.id,
+          thread.id
+        );
+
+        modmailThreads.set(
+          thread.id,
+          message.author.id
+        );
+      }
+
+      let forwardedMessage =
+        `📨 **${message.author.tag}:**\n${message.content || "*No text content*"}`;
+
+      if (message.attachments.size > 0) {
+        forwardedMessage +=
+          "\n\n" +
+          message.attachments
+            .map((attachment: any) => attachment.url)
+            .join("\n");
+      }
+
+      await thread.send(forwardedMessage);
+
+      await message.reply(
+        "📬 Your message has been sent to the staff team."
+      );
+
+    } catch (error) {
+      console.error(
+        "Modmail DM error:",
+        error
+      );
+
+      try {
+        await message.reply(
+          "❌ I couldn't send your Modmail message."
+        );
+      } catch {}
+    }
+
+    return;
+  }
+
+  if (
+    message.channel.isThread() &&
+    message.channel.parentId === MODMAIL_FORUM_ID
+  ) {
+    const command = message.content
+      .trim()
+      .toLowerCase();
+
+    if (command === "!closemail") {
+      return closeMailCommand(message);
+    }
+
+    const userId = modmailThreads.get(message.channel.id);
+
+    if (!userId) {
+      return;
+    }
+
+    try {
+      const user = await client.users.fetch(userId);
+
+      let reply =
+        `🛡️ **Staff:**\n${message.content || "*No text content*"}`;
+
+      if (message.attachments.size > 0) {
+        reply +=
+          "\n\n" +
+          message.attachments
+            .map((attachment: any) => attachment.url)
+            .join("\n");
+      }
+
+      await user.send(reply);
+
+    } catch (error) {
+      console.error(
+        "Failed to send staff Modmail reply:",
+        error
+      );
+
+      await message.reply(
+        "❌ I couldn't DM this user."
+      );
+    }
+
+    return;
+  }
 
   const command = message.content
     .trim()
