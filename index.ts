@@ -10,6 +10,7 @@ const {
 const TOKEN = process.env.TOKEN;
 
 const CLOSED_TAG_ID = "1553708235582869604";
+const CLAIMED_TAG_ID = "1553708304860057620";
 const PENDING_REVIEW_TAG_ID = "1553812865071186000";
 
 const SUGGESTIONS_FORUM_ID = "1533408806833229834";
@@ -19,6 +20,8 @@ const ALLOWED_ROLE_IDS = [
   "1547964808912048299",
   "1548817360247332874"
 ];
+
+const claimedPosts = new Map<string, string>();
 
 const client = new Client({
   intents: [
@@ -44,18 +47,24 @@ async function helpCommand(message: any) {
 - \`!bars\` — Explains the new \`sprite_location\`
 - \`!media\` — Explains media channel rules
 - \`!parser\` — Drops a JSON validator link
-- \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
 - \`!format\` — Reply to a person's message containing JSON to format it correctly
 - \`!escape [command]\` — Escapes a Minecraft command JSON string
 - \`!badges\` — Sends an image showing how to use badges with an explanation
-- \`!handbook\` — Sends the Overgrown Handbook link`
+- \`!handbook\` — Sends the Overgrown Handbook link
+- \`!claim\` — Claims a suggestion post and marks it as being handled
+- \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
+
+🔒 **Contributor / Staff Commands**
+Some commands, such as \`!claim\` and \`!close\`, are restricted to Contributors and staff.`
   );
 }
 
 
 // handbook command
 
-async function handbookCommand(message: { reply: (arg0: string) => any; }) {
+async function handbookCommand(message: {
+  reply: (arg0: string) => any;
+}) {
   await message.reply(
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
   );
@@ -67,7 +76,11 @@ async function handbookCommand(message: { reply: (arg0: string) => any; }) {
 async function formatCommand(message: {
   reference: { messageId: any; };
   reply: (arg0: string) => any;
-  channel: { messages: { fetch: (arg0: any) => any; }; };
+  channel: {
+    messages: {
+      fetch: (arg0: any) => any;
+    };
+  };
 }) {
   if (!message.reference?.messageId) {
     return message.reply(
@@ -139,7 +152,81 @@ async function escapeCommand(message: any) {
 }
 
 
-// close command
+// claim command
+
+async function claimCommand(message: any) {
+  const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
+    message.member.roles.cache.has(roleId)
+  );
+
+  const isModerator = message.member.permissions.has(
+    PermissionFlagsBits.ManageThreads
+  );
+
+  if (!isModerator && !hasAllowedRole) {
+    return message.reply(
+      "❌ You do not have permission to claim posts."
+    );
+  }
+
+  const thread = message.channel;
+
+  if (!thread.isThread()) {
+    return message.reply(
+      "❌ This command can only be used inside a forum post."
+    );
+  }
+
+  if (!thread.parent || thread.parent.type !== ChannelType.GuildForum) {
+    return message.reply(
+      "❌ This command can only be used inside a forum post."
+    );
+  }
+
+  if (claimedPosts.has(thread.id)) {
+    const userId = claimedPosts.get(thread.id);
+
+    return message.reply(
+      `❌ This post is already claimed by <@${userId}>.`
+    );
+  }
+
+  try {
+    let tags = [...thread.appliedTags];
+
+    tags = tags.filter(
+      tagId => tagId !== PENDING_REVIEW_TAG_ID
+    );
+
+    if (!tags.includes(CLAIMED_TAG_ID)) {
+      tags.push(CLAIMED_TAG_ID);
+    }
+
+    await thread.setAppliedTags(
+      tags,
+      `Claimed by ${message.author.tag}`
+    );
+
+    claimedPosts.set(
+      thread.id,
+      message.author.id
+    );
+
+    return message.reply(
+      `🛠️ This post has been claimed by ${message.author}.`
+    );
+
+  } catch (error) {
+    console.error(
+      "Error claiming forum post:",
+      error
+    );
+
+    return message.reply(
+      "❌ I couldn't claim this forum post."
+    );
+  }
+}
 
 async function closeCommand(message: {
   author: any;
@@ -188,9 +275,11 @@ async function closeCommand(message: {
     let tags = [...thread.appliedTags];
 
     tags = tags.filter(
-      tagId => tagId !== PENDING_REVIEW_TAG_ID
+      tagId =>
+        tagId !== PENDING_REVIEW_TAG_ID &&
+        tagId !== CLAIMED_TAG_ID
     );
-
+    
     if (!tags.includes(CLOSED_TAG_ID)) {
       tags.push(CLOSED_TAG_ID);
     }
@@ -199,6 +288,8 @@ async function closeCommand(message: {
       tags,
       `Closed by ${message.author.tag}`
     );
+
+    claimedPosts.delete(thread.id);
 
     await message.reply(
       "🔒 This post has been closed."
@@ -264,6 +355,7 @@ client.on("threadCreate", async (thread: {
   }
 });
 
+
 // command listener
 
 client.on("messageCreate", async (message: any) => {
@@ -283,6 +375,10 @@ client.on("messageCreate", async (message: any) => {
 
   if (command === "!format") {
     return formatCommand(message);
+  }
+
+  if (command === "!claim") {
+    return claimCommand(message);
   }
 
   if (command === "!close") {
