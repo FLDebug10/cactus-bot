@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { data, getTableAsMap } from "./db.ts";
+import { data, getSuggestions, getModMail } from "./db.ts";
 import {
   Client,
   GatewayIntentBits,
@@ -7,13 +7,13 @@ import {
   ChannelType,
   Partials
 } from "discord.js";
-import { Database } from "sqlite";
+import Database from "better-sqlite3";
 
 config()
 
 const TOKEN = process.env.TOKEN;
 
-const DATABASE: Database = await data();
+const DATABASE = await data();
 
 const CLOSED_TAG_ID = "1553708235582869604";
 const CLAIMED_TAG_ID = "1553708304860057620";
@@ -28,22 +28,9 @@ const ALLOWED_ROLE_IDS = [
   "1548817360247332874"
 ];
 
-type thread = {
-  primary: String,
-  claimed: String
-}
 
-const claimedPosts: Map<String, String> = new Map();
 
-const table = await getTableAsMap<thread>(DATABASE.db, "")
-
-for (let key in table) {
-  var thread = table.get(key);
-
-  if (thread == null) continue
-
-  claimedPosts.set(thread.primary, thread.claimed)
-}
+const claimedPosts = new Map<string, string>();
 
 const modmailUsers = new Map<string, string>();
 
@@ -62,7 +49,19 @@ const client = new Client({
   ],
 });
 
-client.once("clientReady", () => {
+client.once("clientReady", async () => {
+  let sug = await getSuggestions(DATABASE)
+  let modMail = await getModMail(DATABASE)
+
+  for (let thread of sug) {
+    claimedPosts.set(thread.thread, thread.user)
+  }
+
+  for (let thread of modMail) {
+    modmailThreads.set(thread.thread, thread.user)
+    modmailUsers.set(thread.user, thread.thread)
+  }
+
   console.log(`Bot online as ${client.user?.tag}`);
 });
 
@@ -251,9 +250,9 @@ async function claimCommand(message: any) {
       message.author.id
     );
 
-    DATABASE.run(`
-      INSERT INTO suggestions (threadID, user) VALUES ('${thread.id}', '${message.author.id}')
-    `)
+    DATABASE.prepare(`
+      INSERT INTO suggestions (thread, user) VALUES ('${thread.id}', '${message.author.id}')
+    `).run()
 
     return message.reply(
       `🛠️ This post has been claimed by ${message.author}.`
@@ -330,6 +329,11 @@ async function closeCommand(message: any) {
 
     claimedPosts.delete(thread.id);
 
+    DATABASE.prepare(`
+      DELETE FROM suggestions
+      WHERE thread = ${thread.id}
+    `).run()
+
     await message.reply(
       "🔒 This post has been closed."
     );
@@ -396,6 +400,11 @@ async function closeMailCommand(message: any) {
 
     modmailThreads.delete(thread.id);
     modmailUsers.delete(userId);
+
+    DATABASE.prepare(`
+      DELETE FROM modMail 
+      WHERE user = ${userId}
+    `).run()
 
     await message.reply(
   "📪 Modmail conversation closed."
@@ -507,6 +516,10 @@ client.on("messageCreate", async (message: any) => {
           thread.id,
           message.author.id
         );
+
+        DATABASE.prepare(`
+          INSERT INTO modMail (thread, user) VALUES ('${thread.id}', '${message.author.id}')
+        `).run()
       }
 
       let forwardedMessage =

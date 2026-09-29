@@ -1,44 +1,41 @@
-import sqlite3, { Database } from 'sqlite3';
-import { open } from 'sqlite';
+import Database from 'better-sqlite3';
 
 export async function data(): Promise<any> {
-    const db = await open({
-        filename: './db.sqlite',
-        driver: sqlite3.Database,
-    });
+    const db = new Database("db.sqlite")
 
-    await db.run(`
+    await db.prepare(`
     CREATE TABLE IF NOT EXISTS suggestions (
-        threadID TEXT PRIMARY KEY,
+        thread TEXT PRIMARY KEY,
         user TEXT
-    );
-    `);
-    await db.run(`
+    )
+    `).run();
+    await db.prepare(`
     CREATE TABLE IF NOT EXISTS modMail (
         user TEXT PRIMARY KEY,
-        threadID TEXT
-    );
-    `)
+        thread TEXT
+    )
+    `).run()
 
     return db;
 }
 
-export function getTableAsMap<T extends {primary: String}>(
-    db: Database,
-  tableName: string
-): Promise<Map<T['primary'], T>> {
-  return new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM ${tableName}`, (error, rows: T[]) => {
-      if (error) {
-        reject(error);
-        return;
-      }
+export type Thread = {
+  user: string,
+  thread: string
+}
 
-      const map = new Map<String, T>(
-        rows.map((row) => [row.primary, row])
-      );
+export async function getSuggestions(db: any): Promise<Thread[]> {
+  if (!(db instanceof Database)) return Promise.reject();
 
-      resolve(map);
-    });
-  });
+  return Promise.resolve(db.prepare(`
+    SELECT * FROM suggestions
+    `).all() as Thread[])
+}
+
+export async function getModMail(db: any): Promise<Thread[]> {
+  if (!(db instanceof Database)) return Promise.reject();
+
+  return Promise.resolve(db.prepare(`
+    SELECT * FROM modMail
+    `).all() as Thread[])
 }
