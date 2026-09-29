@@ -374,18 +374,26 @@ async function closeMailCommand(message: any) {
     modmailUsers.delete(userId);
 
     await message.reply(
-      "📪 Modmail conversation closed."
-    );
+  "📪 Modmail conversation closed."
+);
 
-    await thread.setLocked(
-      true,
-      `Modmail closed by ${message.author.tag}`
-    );
+// Change [OPEN] to [CLOSED]
+if (thread.name.startsWith("[OPEN] ")) {
+  await thread.setName(
+    thread.name.replace("[OPEN] ", "[CLOSED] "),
+    `Modmail closed by ${message.author.tag}`
+  );
+}
 
-    await thread.setArchived(
-      true,
-      `Modmail closed by ${message.author.tag}`
-    );
+await thread.setLocked(
+  true,
+  `Modmail closed by ${message.author.tag}`
+);
+
+await thread.setArchived(
+  true,
+  `Modmail closed by ${message.author.tag}`
+);
 
   } catch (error) {
     console.error(
