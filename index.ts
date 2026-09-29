@@ -574,9 +574,9 @@ client.on("messageCreate", async (message: any) => {
     return helpCommand(message);
   }
 
-  if (command === "!handbook") {
-    return handbookCommand(message);
-  }
+if (command === "!handbook" || command === "!wiki") {
+  return handbookCommand(message);
+}
 
   if (command === "!format") {
     return formatCommand(message);
