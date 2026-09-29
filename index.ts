@@ -1,14 +1,19 @@
-require('dotenv').config();
-
-const {
+import { config } from "dotenv";
+import { data, getTableAsMap } from "./db";
+import {
   Client,
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
-  Partials,
-} = require("discord.js");
+  Partials
+} from "discord.js";
+import { Database } from "sqlite";
+
+config()
 
 const TOKEN = process.env.TOKEN;
+
+const DATABASE: Database = await data();
 
 const CLOSED_TAG_ID = "1553708235582869604";
 const CLAIMED_TAG_ID = "1553708304860057620";
@@ -23,7 +28,22 @@ const ALLOWED_ROLE_IDS = [
   "1548817360247332874"
 ];
 
-const claimedPosts = new Map<string, string>();
+type thread = {
+  primary: String,
+  claimed: String
+}
+
+const claimedPosts: Map<String, String> = new Map();
+
+const table = await getTableAsMap<thread>(DATABASE.db, "")
+
+for (let key in table) {
+  var thread = table.get(key);
+
+  if (thread == null) continue
+
+  claimedPosts.set(thread.primary, thread.claimed)
+}
 
 const modmailUsers = new Map<string, string>();
 
@@ -43,7 +63,7 @@ const client = new Client({
 });
 
 client.once("clientReady", () => {
-  console.log(`Bot online as ${client.user.tag}`);
+  console.log(`Bot online as ${client.user?.tag}`);
 });
 
 
@@ -230,6 +250,10 @@ async function claimCommand(message: any) {
       thread.id,
       message.author.id
     );
+
+    DATABASE.run(`
+      INSERT INTO suggestions (threadID, user) VALUES ('${thread.id}', '${message.author.id}')
+    `)
 
     return message.reply(
       `🛠️ This post has been claimed by ${message.author}.`

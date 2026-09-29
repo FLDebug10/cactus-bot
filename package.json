@@ -8,10 +8,15 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "GPL-3.0-only",
+  "type": "module",
   "dependencies": {
     "discord.js": "^14.27.0",
-    "dotenv": "^18.0.4"
+    "dotenv": "^18.0.4",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^6.0.1"
+  },
+  "allowScripts": {
+    "sqlite3@6.0.1": true
   }
 }
