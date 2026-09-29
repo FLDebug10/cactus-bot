@@ -66,7 +66,7 @@ async function handbookCommand(message: {
   reply: (arg0: string) => any;
 }) {
   await message.reply(
-    "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/"
+    "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/docs/datapack/introduction/overview/"
   );
 }
 
