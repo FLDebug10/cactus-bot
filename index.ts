@@ -1,13 +1,18 @@
-require('dotenv').config();
-
-const {
+import { config } from "dotenv";
+import { data, getTableAsMap } from "./db";
+import {
   Client,
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
-} = require("discord.js");
+} from "discord.js";
+import { Database } from "sqlite";
+
+config()
 
 const TOKEN = process.env.TOKEN;
+
+const DATABASE: Database = await data();
 
 const CLOSED_TAG_ID = "1553708235582869604";
 const CLAIMED_TAG_ID = "1553708304860057620";
@@ -21,7 +26,22 @@ const ALLOWED_ROLE_IDS = [
   "1548817360247332874"
 ];
 
-const claimedPosts = new Map<string, string>();
+type thread = {
+  primary: String,
+  claimed: String
+}
+
+const claimedPosts: Map<String, String> = new Map();
+
+const table = await getTableAsMap<thread>(DATABASE.db, "")
+
+for (let key in table) {
+  var thread = table.get(key);
+
+  if (thread == null) continue
+
+  claimedPosts.set(thread.primary, thread.claimed)
+}
 
 const client = new Client({
   intents: [
@@ -32,7 +52,7 @@ const client = new Client({
 });
 
 client.once("clientReady", () => {
-  console.log(`Bot online as ${client.user.tag}`);
+  console.log(`Bot online as ${client.user?.tag}`);
 });
 
 
@@ -220,6 +240,10 @@ async function claimCommand(message: any) {
       message.author.id
     );
 
+    DATABASE.run(`
+      INSERT INTO suggestions (threadID, user) VALUES ('${thread.id}', '${message.author.id}')
+    `)
+
     return message.reply(
       `🛠️ This post has been claimed by ${message.author}.`
     );
@@ -341,12 +365,7 @@ async function closeCommand(message: {
   }
 }
 
-client.on("threadCreate", async (thread: {
-  name: any;
-  parentId: string;
-  appliedTags: any;
-  setAppliedTags: (arg0: any[], arg1: string) => any;
-}) => {
+client.on("threadCreate", async (thread) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
 
   try {
