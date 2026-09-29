@@ -33,6 +33,26 @@ client.once("clientReady", () => {
 });
 
 
+// help command
+
+async function helpCommand(message: any) {
+  return message.reply(
+`🌵 **List of Commands:**
+
+- \`!rbr\` — Redirect Bug Reports
+- \`!rds\` — Redirect Datapack Support
+- \`!bars\` — Explains the new \`sprite_location\`
+- \`!media\` — Explains media channel rules
+- \`!parser\` — Drops a JSON validator link
+- \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
+- \`!format\` — Reply to a person's message containing JSON to format it correctly
+- \`!escape [command]\` — Escapes a Minecraft command JSON string
+- \`!badges\` — Sends an image showing how to use badges with an explanation
+- \`!handbook\` — Sends the Overgrown Handbook link`
+  );
+}
+
+
 // handbook command
 
 async function handbookCommand(message: { reply: (arg0: string) => any; }) {
@@ -244,12 +264,18 @@ client.on("threadCreate", async (thread: {
   }
 });
 
+// command listener
+
 client.on("messageCreate", async (message: any) => {
   if (message.author.bot) return;
 
   const command = message.content
     .trim()
     .toLowerCase();
+
+  if (command === "!help") {
+    return helpCommand(message);
+  }
 
   if (command === "!handbook") {
     return handbookCommand(message);
