@@ -5,7 +5,8 @@ import {
   GatewayIntentBits,
   PermissionFlagsBits,
   ChannelType,
-  Partials
+  Partials,
+  ActivityType
 } from "discord.js";
 import Database from "better-sqlite3";
 
@@ -29,7 +30,6 @@ const ALLOWED_ROLE_IDS = [
 ];
 
 
-
 const claimedPosts = new Map<string, string>();
 
 const modmailUsers = new Map<string, string>();
@@ -49,6 +49,7 @@ const client = new Client({
   ],
 });
 
+
 client.once("clientReady", async () => {
   let sug = await getSuggestions(DATABASE)
   let modMail = await getModMail(DATABASE)
@@ -61,6 +62,10 @@ client.once("clientReady", async () => {
     modmailThreads.set(thread.thread, thread.user)
     modmailUsers.set(thread.user, thread.thread)
   }
+
+  client.user?.setActivity("Overgrown's Origins", {
+    type: ActivityType.Playing,
+  });
 
   console.log(`Bot online as ${client.user?.tag}`);
 });
@@ -80,7 +85,7 @@ async function helpCommand(message: any) {
 - \`!format\` — Reply to a person's message containing JSON to format it correctly
 - \`!escape [command]\` — Escapes a Minecraft command JSON string
 - \`!badges\` — Sends an image showing how to use badges with an explanation
-- \`!handbook\` — Sends the Overgrown Handbook link
+- \`!handbook\` / \`!wiki\` — Sends the Overgrown Handbook link
 - \`!claim\` — Claims a suggestion post and marks it as being handled
 - \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
 - \`!closemail\` — Closes the current Modmail conversation
@@ -180,6 +185,38 @@ async function escapeCommand(message: any) {
   return message.reply(
     `\`\`\`\n${escaped}\n\`\`\``
   );
+}
+
+
+// kill Drizzo command
+
+async function killDrizzoCommand(message: any) {
+  if (!message.guild || !message.member) {
+    return message.reply(
+      "❌ This command can only be used inside the server."
+    );
+  }
+
+  try {
+    await message.member.timeout(
+      90_000,
+      "Attempted to kill Drizzo"
+    );
+
+    return message.reply(
+      "Drizzo is a protected user. You CANNOT kill them. You are now muted for eternity."
+    );
+
+  } catch (error) {
+    console.error(
+      "Error timing out user for !killdrizzo:",
+      error
+    );
+
+    return message.reply(
+      "Drizzo is a protected user. You CANNOT kill them. You are now muted for eternity."
+    );
+  }
 }
 
 
@@ -366,6 +403,9 @@ async function closeCommand(message: any) {
   }
 }
 
+
+// close modmail command
+
 async function closeMailCommand(message: any) {
   const thread = message.channel;
 
@@ -407,26 +447,26 @@ async function closeMailCommand(message: any) {
     `).run()
 
     await message.reply(
-  "📪 Modmail conversation closed."
-);
+      "📪 Modmail conversation closed."
+    );
 
-// Change [OPEN] to [CLOSED]
-if (thread.name.startsWith("[OPEN] ")) {
-  await thread.setName(
-    thread.name.replace("[OPEN] ", "[CLOSED] "),
-    `Modmail closed by ${message.author.tag}`
-  );
-}
+    // Change [OPEN] to [CLOSED]
+    if (thread.name.startsWith("[OPEN] ")) {
+      await thread.setName(
+        thread.name.replace("[OPEN] ", "[CLOSED] "),
+        `Modmail closed by ${message.author.tag}`
+      );
+    }
 
-await thread.setLocked(
-  true,
-  `Modmail closed by ${message.author.tag}`
-);
+    await thread.setLocked(
+      true,
+      `Modmail closed by ${message.author.tag}`
+    );
 
-await thread.setArchived(
-  true,
-  `Modmail closed by ${message.author.tag}`
-);
+    await thread.setArchived(
+      true,
+      `Modmail closed by ${message.author.tag}`
+    );
 
   } catch (error) {
     console.error(
@@ -439,6 +479,9 @@ await thread.setArchived(
     );
   }
 }
+
+
+// automatically tag new suggestion posts
 
 client.on("threadCreate", async (thread: any) => {
   if (thread.parentId !== SUGGESTIONS_FORUM_ID) return;
@@ -469,6 +512,9 @@ client.on("threadCreate", async (thread: any) => {
 
 client.on("messageCreate", async (message: any) => {
   if (message.author.bot) return;
+
+
+  // MODMAIL — USER DMS BOT
 
   if (message.channel.type === ChannelType.DM) {
     try {
@@ -555,6 +601,9 @@ client.on("messageCreate", async (message: any) => {
     return;
   }
 
+
+  // MODMAIL — STAFF REPLY
+
   if (
     message.channel.isThread() &&
     message.channel.parentId === MODMAIL_FORUM_ID
@@ -603,6 +652,9 @@ client.on("messageCreate", async (message: any) => {
     return;
   }
 
+
+  // NORMAL COMMANDS
+
   const command = message.content
     .trim()
     .toLowerCase();
@@ -611,9 +663,13 @@ client.on("messageCreate", async (message: any) => {
     return helpCommand(message);
   }
 
-if (command === "!handbook" || command === "!wiki") {
-  return handbookCommand(message);
-}
+  if (command === "!handbook" || command === "!wiki") {
+    return handbookCommand(message);
+  }
+
+  if (command === "!killdrizzo") {
+    return killDrizzoCommand(message);
+  }
 
   if (command === "!format") {
     return formatCommand(message);
