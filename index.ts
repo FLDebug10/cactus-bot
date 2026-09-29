@@ -67,7 +67,7 @@ async function helpCommand(message: any) {
 - \`!closemail\` — Closes the current Modmail conversation
 
 🔒 **Contributor / Staff Commands**
-Some commands, such as \`!claim\`, \`!close\`, and \`!closemail\`, are restricted to Contributors and staff.`
+\`!claim\`, \`!close\`, and \`!closemail\` are restricted to Contributors and staff.`
   );
 }
 
