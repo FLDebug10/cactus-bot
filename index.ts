@@ -198,6 +198,7 @@ async function claimCommand(message: any) {
       tagId => tagId !== PENDING_REVIEW_TAG_ID
     );
 
+    // Add Claimed
     if (!tags.includes(CLAIMED_TAG_ID)) {
       tags.push(CLAIMED_TAG_ID);
     }
@@ -206,6 +207,13 @@ async function claimCommand(message: any) {
       tags,
       `Claimed by ${message.author.tag}`
     );
+    
+    if (!thread.name.startsWith("[CLAIMED] ")) {
+      await thread.setName(
+        `[CLAIMED] ${thread.name}`,
+        `Claimed by ${message.author.tag}`
+      );
+    }
 
     claimedPosts.set(
       thread.id,
@@ -227,6 +235,9 @@ async function claimCommand(message: any) {
     );
   }
 }
+
+
+// close command
 
 async function closeCommand(message: {
   author: any;
@@ -279,7 +290,7 @@ async function closeCommand(message: {
         tagId !== PENDING_REVIEW_TAG_ID &&
         tagId !== CLAIMED_TAG_ID
     );
-    
+
     if (!tags.includes(CLOSED_TAG_ID)) {
       tags.push(CLOSED_TAG_ID);
     }
@@ -288,6 +299,13 @@ async function closeCommand(message: {
       tags,
       `Closed by ${message.author.tag}`
     );
+
+    if (thread.name.startsWith("[CLAIMED] ")) {
+      await thread.setName(
+        thread.name.replace("[CLAIMED] ", ""),
+        `Closed by ${message.author.tag}`
+      );
+    }
 
     claimedPosts.delete(thread.id);
 
