@@ -75,7 +75,7 @@ client.once("clientReady", async () => {
 
 async function helpCommand(message: any) {
   return message.reply(
-`🌵 **List of Commands:**
+`🌺 **List of Commands:**
 
 - \`!rbr\` — Redirect Bug Reports
 - \`!rds\` — Redirect Datapack Support
