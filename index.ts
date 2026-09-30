@@ -75,7 +75,7 @@ client.once("clientReady", async () => {
 
 async function helpCommand(message: any) {
   return message.reply(
-`:grove: **List of Commands:**
+`<:grove:1554976275729223740> **List of Commands:**
 
 - \`!rbr\` — Redirect Bug Reports
 - \`!rds\` — Redirect Datapack Support
