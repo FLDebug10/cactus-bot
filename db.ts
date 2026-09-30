@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 
 export async function data(): Promise<any> {
-    const db = new Database("./data/database.db")
+    const db = new Database("data/database.db")
 
     await db.prepare(`
     CREATE TABLE IF NOT EXISTS suggestions (
