@@ -1,14 +1,14 @@
-FROM node:22-alpine
+FROM node:22-slim
+WORKDIR /app
 
-WORKDIR /
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm install  
-
+RUN npm ci
 COPY . .
 
-ENV NODE_ENV=production
-
-USER node
-
+ENV DB_PATH=/data/db.sqlite
+VOLUME /data
 CMD ["node", "index.ts"]
