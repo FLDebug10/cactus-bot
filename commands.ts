@@ -1,6 +1,6 @@
 // help command
 
-import { Message, PermissionFlagsBits, ChannelType } from "discord.js";
+import { Message, PermissionFlagsBits, ChannelType, MessagePayload, EmbedBuilder, AttachmentBuilder } from "discord.js";
 import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
 
 export async function helpCommand(message: any) {
@@ -29,6 +29,28 @@ export async function rbrCommand(message: Message) {
     await message.reply(`Please use <#1533408856682663956> to report any bugs you encounter.
 
 This helps keep bug reports organized and makes it easier to track and address issues without cluttering the main discussion channels.`)
+}
+
+export async function rdsCommand(message: Message) {
+    await message.reply(`Please use <#1533211757407895634> for help with making powers and datapacking.
+
+This helps avoid clutter in channels used for discussion and chatting with others.`)
+}
+
+export async function barsCommand(message: Message) {
+    const msgString = `The sprite location for resource bars has changed slightly when moving from **Apace's Origins** to **Overgrown's Origins**.
+
+The new location is:
+\`"sprite_location": "origins:textures/gui/sprites/hud_render/<artist_name>/resource_bar_#.png"\``
+
+    const msgEmbed = new EmbedBuilder().setImage("attachment://bars.png")
+    const msgAttachment = new AttachmentBuilder("./bars.png")
+
+    await message.reply({
+      content: msgString,
+      embeds: [msgEmbed],
+      files: [msgAttachment]
+    })
 }
 
 
