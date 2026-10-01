@@ -25,6 +25,47 @@ export async function helpCommand(message: any) {
   );
 }
 
+export async function compCommand(message: Message) {
+  const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
+    message.member?.roles.cache.has(roleId)
+  );
+
+  const isModerator = message.member?.permissions.has(
+    PermissionFlagsBits.ManageThreads
+  );
+
+  if (!isModerator && !hasAllowedRole) {
+    return;
+  }
+
+  await message.reply(`Competitive Jam Rules
+
+This jam will include an optional competition alongside the usual jam submissions.
+
+To enter your submission into the competition, tag it with Comp Submission when submitting it.
+
+If you do not use the Comp Submission tag, your entry will still count as a normal jam submission and you will still receive the jam participant role. The competition is completely optional.
+
+How judging works
+Once submissions close, the finalists will be chosen in two ways:
+The moderation team will select 2–3 submissions to move forward.
+The community will also choose 1 submission to move forward.
+Once the finalists have been selected, a community poll will be held to decide the overall 1st place winner.
+
+The winner will receive a custom Discord emoji dedicated to them and their winning submission, which will be added to the server.
+
+Competitive conduct
+Please keep the competition friendly.
+
+The purpose of the jam is still to create something, have fun, and see what everyone comes up with. Do not turn the jam-discussion channel into arguments, rivalry, campaigning, putting down other submissions, or overly competitive behaviour.
+
+You are welcome to be excited about your entry and discuss the competition, but keep it respectful toward everyone taking part.
+
+If the competitive format causes repeated scuffles or creates a negative atmosphere, we will stop running competitive jams in the future.
+
+Winning is a bonus. The jam itself comes first.`)
+}
+
 export async function parserCommand(message: Message) {
     await message.reply(`Having trouble finding an error in your JSON?
 
