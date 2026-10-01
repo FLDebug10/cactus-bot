@@ -221,6 +221,34 @@ async function killDrizzoCommand(message: any) {
   }
 }
 
+async function killFLDCommand(message: any) {
+  if (!message.guild || !message.member) {
+    return message.reply(
+      "❌ This command can only be used inside the server."
+    );
+  }
+
+  try {
+    await message.member.timeout(
+      90_000,
+      "Attempted to kill FLD10"
+    );
+
+    return message.reply(
+      "FLD10 is a protected user. You CANNOT kill them. You are now muted for eternity."
+    );
+
+  } catch (error) {
+    console.error(
+      "Error timing out user for !killfld:",
+      error
+    );
+
+    return message.reply(
+      "FLD10 is a protected user. You CANNOT kill them. You are now muted for eternity."
+    );
+  }
+}
 
 // claim command
 
@@ -671,6 +699,10 @@ client.on("messageCreate", async (message: any) => {
 
   if (command === "!killdrizzo") {
     return killDrizzoCommand(message);
+  }
+
+  if (command === "!killfld") {
+    return killFLDCommand(message)
   }
 
   if (command === "!format") {
