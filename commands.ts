@@ -25,6 +25,28 @@ export async function helpCommand(message: any) {
   );
 }
 
+export async function parserCommand(message: Message) {
+    await message.reply(`Having trouble finding an error in your JSON?
+
+Use JSON Checker to quickly validate your code and spot syntax mistakes:
+
+🔗 https://jsonchecker.com/
+
+> Helpful for catching missing commas, brackets, quotation marks, and other JSON formatting errors.`)
+}
+
+export async function mediaCommand(message: Message) {
+    await message.reply(`## The Media Gallery
+
+This is a **no-talk zone** for sharing clips and screenshots of what you're working on.
+
+Want to comment? **Start a thread on the post** and discuss it there.
+
+📸 **Post your work.**
+💬 **Discuss in threads.**
+🚫 **No standalone messages.**`)
+}
+
 export async function rbrCommand(message: Message) {
     await message.reply(`Please use <#1533408856682663956> to report any bugs you encounter.
 
@@ -45,6 +67,19 @@ The new location is:
 
     const msgEmbed = new EmbedBuilder().setImage("attachment://bars.png")
     const msgAttachment = new AttachmentBuilder("./bars.png")
+
+    await message.reply({
+      content: msgString,
+      embeds: [msgEmbed],
+      files: [msgAttachment]
+    })
+}
+
+export async function badgesCommand(message: Message) {
+    const msgString = ``
+
+    const msgEmbed = new EmbedBuilder().setImage("attachment://badges.png")
+    const msgAttachment = new AttachmentBuilder("./badges.png")
 
     await message.reply({
       content: msgString,

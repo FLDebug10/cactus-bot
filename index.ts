@@ -10,7 +10,7 @@ import {
   Message
 } from "discord.js";
 import Database from "better-sqlite3";
-import { barsCommand, claimCommand, closeCommand, closeMailCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, rbrCommand } from "./commands.ts"
+import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand } from "./commands.ts"
 
 config()
 
@@ -290,6 +290,22 @@ client.on("messageCreate", async (message: Message) => {
 
   if (command === "!rbr") {
     return await rbrCommand(message)
+  }
+
+  if (command === "!rds") {
+    return await rdsCommand(message)
+  }
+
+  if (command === "!media") {
+    return await mediaCommand(message)
+  }
+
+  if (command === "!parser") {
+    return await parserCommand(message)
+  }
+
+  if (command === "!badges") {
+    return await badgesCommand(message)
   }
 
   if (command === "!ping") {
