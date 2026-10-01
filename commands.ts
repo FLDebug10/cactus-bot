@@ -38,23 +38,23 @@ export async function compCommand(message: Message) {
     return;
   }
 
-  await message.reply(`Competitive Jam Rules
+  await message.reply(`**Competitive Jam Rules**
 
 This jam will include an optional competition alongside the usual jam submissions.
 
-To enter your submission into the competition, tag it with Comp Submission when submitting it.
+To enter your submission into the competition, tag it with \`Comp Submission\` when submitting it.
 
-If you do not use the Comp Submission tag, your entry will still count as a normal jam submission and you will still receive the jam participant role. The competition is completely optional.
+If you do not use the \`Comp Submission\` tag, your entry will still count as a normal jam submission and you will still receive the jam participant role. The competition is completely optional.
 
-How judging works
+**How judging works**
 Once submissions close, the finalists will be chosen in two ways:
-The moderation team will select 2–3 submissions to move forward.
-The community will also choose 1 submission to move forward.
+- The moderation team will select 2–3 submissions to move forward.
+- The community will also choose 1 submission to move forward.
 Once the finalists have been selected, a community poll will be held to decide the overall 1st place winner.
 
 The winner will receive a custom Discord emoji dedicated to them and their winning submission, which will be added to the server.
 
-Competitive conduct
+**Competitive conduct**
 Please keep the competition friendly.
 
 The purpose of the jam is still to create something, have fun, and see what everyone comes up with. Do not turn the jam-discussion channel into arguments, rivalry, campaigning, putting down other submissions, or overly competitive behaviour.
