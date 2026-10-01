@@ -6,7 +6,8 @@ import {
   PermissionFlagsBits,
   ChannelType,
   Partials,
-  ActivityType
+  ActivityType,
+  Message
 } from "discord.js";
 import Database from "better-sqlite3";
 
@@ -30,6 +31,11 @@ const ALLOWED_ROLE_IDS = [
   "1554994395449917581",
   "1547961618980274226"
 ];
+
+const EMOJIS = [
+  "<:grove:1554976275729223740>",
+  "<:grove_orb:1555207821291683950>"
+]
 
 
 const claimedPosts = new Map<string, string>();
@@ -111,15 +117,7 @@ async function handbookCommand(message: {
 
 // format command
 
-async function formatCommand(message: {
-  reference: { messageId: any; };
-  reply: (arg0: string) => any;
-  channel: {
-    messages: {
-      fetch: (arg0: any) => any;
-    };
-  };
-}) {
+async function formatCommand(message: Message) {
   if (!message.reference?.messageId) {
     return message.reply(
       "❌ Reply to a message containing JSON, then use !format."
@@ -540,7 +538,7 @@ client.on("threadCreate", async (thread: any) => {
   }
 });
 
-client.on("messageCreate", async (message: any) => {
+client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
 
 
@@ -689,6 +687,15 @@ client.on("messageCreate", async (message: any) => {
     .trim()
     .toLowerCase();
 
+  if (command.includes("grove")) {
+    try {
+      let emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
+      await message.react(emoji)
+    } catch (error) {
+      console.error("Error while reacting to message: ", error)
+    }
+  }
+
   if (command === "!help") {
     return helpCommand(message);
   }
@@ -701,7 +708,7 @@ client.on("messageCreate", async (message: any) => {
     return killDrizzoCommand(message);
   }
 
-  if (command === "!killfld") {
+  if (command === "!killfld" || command === "!killfld10") {
     return killFLDCommand(message)
   }
 
