@@ -706,8 +706,20 @@ if (groveRegex.test(message.content)) {
 }
 
   if (client.user != null ? message.mentions.has(client.user.id) : false) {
-    let reply = REPLYS[Math.floor(Math.random() * REPLYS.length)]
-    await message.reply(reply)
+    try {
+      let reply = REPLYS[Math.floor(Math.random() * REPLYS.length)]
+      await message.reply(reply)
+    } catch (error) {
+      console.error("Error while responding to message: ", error)
+    }
+  }
+
+  if (command === "!ping") {
+    try {
+      return await message.reply("pong!")
+    } catch (error) {
+      console.error("Error while responding to message: ", error)
+    }
   }
 
   if (command === "!help") {
