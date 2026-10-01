@@ -705,7 +705,7 @@ if (groveRegex.test(message.content)) {
   }
 }
 
-  if (client.user != null ? message.mentions.has(client.user.tag) : false) {
+  if (client.user != null ? message.mentions.has(client.user.id) : false) {
     let reply = REPLYS[Math.floor(Math.random() * REPLYS.length)]
     await message.reply(reply)
   }
