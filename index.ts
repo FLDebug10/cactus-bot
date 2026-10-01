@@ -687,14 +687,16 @@ client.on("messageCreate", async (message: Message) => {
     .trim()
     .toLowerCase();
 
-  if (command.includes("grove")) {
-    try {
-      let emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
-      await message.react(emoji)
-    } catch (error) {
-      console.error("Error while reacting to message: ", error)
-    }
+const groveRegex = /(?:^|\s)grove(?:\s|$)/i;
+
+if (groveRegex.test(message.content)) {
+  try {
+    const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+    await message.react(emoji);
+  } catch (error) {
+    console.error("Error while reacting to message: ", error);
   }
+}
 
   if (command === "!help") {
     return helpCommand(message);
