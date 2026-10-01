@@ -10,7 +10,7 @@ import {
   Message
 } from "discord.js";
 import Database from "better-sqlite3";
-import { claimCommand, closeCommand, closeMailCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand } from "./commands.ts"
+import { claimCommand, closeCommand, closeMailCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, rbrCommand } from "./commands.ts"
 
 config()
 
@@ -264,16 +264,16 @@ client.on("messageCreate", async (message: Message) => {
     .trim()
     .toLowerCase();
 
-const groveRegex = /(?:^|\s)grove(?:\s|$)/i;
+  const groveRegex = /(?:^|\s)grove(?:\s|$)/i;
 
-if (groveRegex.test(message.content)) {
-  try {
-    const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-    await message.react(emoji);
-  } catch (error) {
-    console.error("Error while reacting to message: ", error);
+  if (groveRegex.test(message.content)) {
+    try {
+      const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+      await message.react(emoji);
+    } catch (error) {
+      console.error("Error while reacting to message: ", error);
+    }
   }
-}
 
   if (client.user != null ? message.mentions.has(client.user.id) : false) {
     try {
@@ -282,6 +282,10 @@ if (groveRegex.test(message.content)) {
     } catch (error) {
       console.error("Error while responding to message: ", error)
     }
+  }
+
+  if (command === "!rbr") {
+    return await rbrCommand(message)
   }
 
   if (command === "!ping") {

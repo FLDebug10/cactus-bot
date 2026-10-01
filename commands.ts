@@ -25,12 +25,16 @@ export async function helpCommand(message: any) {
   );
 }
 
+export async function rbrCommand(message: Message) {
+    await message.reply(`Please use <#1533408856682663956> to report any bugs you encounter.
+
+This helps keep bug reports organized and makes it easier to track and address issues without cluttering the main discussion channels.`)
+}
+
 
 // handbook command
 
-export async function handbookCommand(message: {
-  reply: (arg0: string) => any;
-}) {
+export async function handbookCommand(message: Message) {
   await message.reply(
     "📘 **Overgrown Handbook**\nhttps://0vergrown.github.io/Handbook/docs/datapack/introduction/overview/"
   );
