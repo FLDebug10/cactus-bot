@@ -37,6 +37,13 @@ const EMOJIS = [
   "<:grove_orb:1555207821291683950>"
 ]
 
+const REPLYS = [
+  "yeah?",
+  "hello!",
+  "yup, thats me!",
+  "need something?"
+]
+
 
 const claimedPosts = new Map<string, string>();
 
@@ -697,6 +704,11 @@ if (groveRegex.test(message.content)) {
     console.error("Error while reacting to message: ", error);
   }
 }
+
+  if (client.user != null ? message.mentions.has(client.user.tag) : false) {
+    let reply = REPLYS[Math.floor(Math.random() * REPLYS.length)]
+    await message.reply(reply)
+  }
 
   if (command === "!help") {
     return helpCommand(message);
