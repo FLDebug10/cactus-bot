@@ -21,7 +21,28 @@ export async function registerSlashCommand(interaction: Interaction) {
   return await interaction.showModal(modal)
 }
 
-export async function registerModal(interaction: Interaction, commands: Map<string, Command>, db: any, cmdArray: Command[]) {
+export async function unregisterSlashCommand(interaction: Interaction, db: any, commands: Map<string, Command>) {
+  if (!interaction.isChatInputCommand() || !(db instanceof Database)) return;
+
+  const command = interaction.options.getString("command", true)
+
+  try {
+    db.prepare(`
+      REMOVE FROM commands WHERE cmd = ?
+    `).run(command)
+
+    commands.delete(command)
+  } catch (error) {
+    console.error(error)
+  }
+
+  return await interaction.reply({
+        content: `Unregistered Command ${command}`,
+        flags: MessageFlags.Ephemeral,
+      })
+}
+
+export async function registerModal(interaction: Interaction, commands: Map<string, Command>, db: any) {
   if (!(db instanceof Database)) return
   if (!interaction.isModalSubmit()) return
 
@@ -43,12 +64,6 @@ export async function registerModal(interaction: Interaction, commands: Map<stri
       `).run(cmd, help,out)
 
       commands.set(cmd, {
-        cmd: cmd,
-        help: help,
-        out: out
-      })
-
-      cmdArray.push({
         cmd: cmd,
         help: help,
         out: out

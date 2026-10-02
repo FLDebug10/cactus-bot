@@ -15,7 +15,7 @@ import {
   type Interaction,
   PermissionFlagsBits
 } from "discord.js";
-import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand } from "./commands.ts"
+import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand, unregisterSlashCommand } from "./commands.ts"
 
 config()
 
@@ -63,7 +63,6 @@ const modmailUsers = new Map<string, string>();
 const modmailThreads = new Map<string, string>();
 
 const commands = new Map<string, Command>();
-let cmdArray: Command[] = []
 
 export const client = new Client({
   intents: [
@@ -84,7 +83,10 @@ async function deployCommands() {
 
   await rest.put(
     Routes.applicationCommands(client.user?.id!!),
-    { body: [(new SlashCommandBuilder().setName("register").setDescription("Register Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command, excluding \`!\`: \`example\` results in !example").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild | PermissionFlagsBits.ModerateMembers)).toJSON()] }
+    { body: [
+      (new SlashCommandBuilder().setName("register").setDescription("Register Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild | PermissionFlagsBits.ModerateMembers)).toJSON(),
+      (new SlashCommandBuilder().setName("unregister").setDescription("Unregister Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(true).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild | PermissionFlagsBits.ModerateMembers)).toJSON()
+    ] }
   );
 
   console.log('Registered Slash Commands');
@@ -94,7 +96,7 @@ async function deployCommands() {
 client.once("clientReady", async () => {
   let sug = await getSuggestions(DATABASE)
   let modMail = await getModMail(DATABASE)
-  cmdArray = await getCommands(DATABASE)
+  let cmdArray = await getCommands(DATABASE)
 
   for (let thread of sug) {
     claimedPosts.set(thread.thread, thread.user)
@@ -149,11 +151,12 @@ client.on("threadCreate", async (thread: any) => {
 
 client.on("interactionCreate", async (interaction: Interaction) => {
   if (interaction.isChatInputCommand()) {
-    await registerSlashCommand(interaction)
+    if (interaction.commandName === "register") await registerSlashCommand(interaction)
+    else if (interaction.commandName === "unregister") await unregisterSlashCommand(interaction, DATABASE, commands)
   }
 
   if (interaction.isModalSubmit()) {
-    await registerModal(interaction, commands, DATABASE, cmdArray)
+    await registerModal(interaction, commands, DATABASE)
   }
 })
 
@@ -367,7 +370,7 @@ client.on("messageCreate", async (message: Message) => {
   }
 
   if (command === "!help") {
-    return helpCommand(message, cmdArray);
+    return helpCommand(message, [...commands].map((elem) => elem[1]));
   }
 
   if (command === "!handbook" || command === "!wiki") {
