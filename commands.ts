@@ -28,7 +28,7 @@ export async function unregisterSlashCommand(interaction: Interaction, db: any, 
 
   try {
     db.prepare(`
-      REMOVE FROM commands WHERE cmd = ?
+      DELETE FROM commands WHERE cmd = ?
     `).run(command)
 
     commands.delete(command)
@@ -59,6 +59,12 @@ export async function registerModal(interaction: Interaction, commands: Map<stri
     }
 
     try {
+      if (commands.has(cmd)) {
+        db.prepare(`
+          DELETE FROM commands WHERE cmd = ?
+        `).run(cmd)
+      }
+
       db.prepare(`
         INSERT INTO commands (cmd, help, out) VALUES (?, ?, ?)
       `).run(cmd, help,out)
