@@ -1,6 +1,6 @@
 // help command
 
-import { Message, PermissionFlagsBits, ChannelType, EmbedBuilder, AttachmentBuilder, type Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, MessageFlags } from "discord.js";
+import { Message, PermissionFlagsBits, ChannelType, EmbedBuilder, AttachmentBuilder, type Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, MessageFlags, TextChannel } from "discord.js";
 import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
 import Database from "better-sqlite3";
 import type { Command } from "./db.ts";
@@ -20,16 +20,12 @@ export async function sayCommand(message: Message) {
 
   const content = message.content.replace(/^!say\s*/i, "")
 
-  let msg: Message
-
   if (message.reference != null) {
-    msg = await message.channel.messages.fetch(message.reference?.messageId!!)
+    await (await message.channel.messages.fetch(message.reference?.messageId!!)).reply(content)
   }
   else {
-    msg = message
+    await (message.channel as TextChannel).send(content)
   }
-
-  await msg.reply(content)
 
   return await message.delete()
 }
