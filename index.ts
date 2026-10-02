@@ -15,7 +15,7 @@ import {
   type Interaction,
   PermissionFlagsBits
 } from "discord.js";
-import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand, unregisterSlashCommand } from "./commands.ts"
+import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand, sayCommand, unregisterSlashCommand } from "./commands.ts"
 
 config()
 
@@ -401,7 +401,9 @@ client.on("messageCreate", async (message: Message) => {
     return escapeCommand(message);
   }
 
-  if(command.startsWith("!say"))
+  if(command.startsWith("!say")) {
+    return await sayCommand(message)
+  }
 
   if (commands.has(command)) {
     var cmd = commands.get(command)!!

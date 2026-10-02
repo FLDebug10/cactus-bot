@@ -15,7 +15,6 @@ export async function sayCommand(message: Message) {
   );
 
   if (!isModerator && !hasAllowedRole) {
-    console.warn("Tried to use !say without perms, ignoring!")
     return;
   }
 
@@ -30,7 +29,7 @@ export async function sayCommand(message: Message) {
     msg = message
   }
 
-  msg.reply(content)
+  await msg.reply(content)
 
   return await message.delete()
 }
