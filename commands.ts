@@ -5,6 +5,35 @@ import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODM
 import Database from "better-sqlite3";
 import type { Command } from "./db.ts";
 
+export async function sayCommand(message: Message) {
+  const hasAllowedRole = ALLOWED_ROLE_IDS.some(roleId =>
+    message.member?.roles.cache.has(roleId)
+  );
+
+  const isModerator = message.member?.permissions.has(
+    PermissionFlagsBits.ManageThreads
+  );
+
+  if (!isModerator && !hasAllowedRole) {
+    return;
+  }
+
+  const content = message.content.replace(/^!say\s*/i, "")
+
+  let msg: Message
+
+  if (message.reference != null) {
+    msg = await message.channel.messages.fetch(message.reference?.messageId!!)
+  }
+  else {
+    msg = message
+  }
+
+  msg.reply(content)
+
+  return await message.delete()
+}
+
 export async function registerSlashCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand()) return;
 

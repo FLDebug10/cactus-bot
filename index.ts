@@ -333,7 +333,7 @@ client.on("messageCreate", async (message: Message) => {
     }
   }
 
-  if (command === "!bars") {
+  if (command.startsWith("!bars")) {
     return await barsCommand(message)
   }
 
@@ -341,11 +341,11 @@ client.on("messageCreate", async (message: Message) => {
     return await compCommand(message)
   }
 
-  if (command === "!rbr") {
+  if (command.startsWith("!rbr")) {
     return await rbrCommand(message)
   }
 
-  if (command === "!rds") {
+  if (command.startsWith("!rds")) {
     return await rdsCommand(message)
   }
 
@@ -357,7 +357,7 @@ client.on("messageCreate", async (message: Message) => {
     return await parserCommand(message)
   }
 
-  if (command === "!badges") {
+  if (command.startsWith("!badges")) {
     return await badgesCommand(message)
   }
 
@@ -373,7 +373,7 @@ client.on("messageCreate", async (message: Message) => {
     return helpCommand(message, [...commands].map((elem) => elem[1]));
   }
 
-  if (command === "!handbook" || command === "!wiki") {
+  if (command.startsWith("!handbook") || command.startsWith("!wiki")) {
     return handbookCommand(message);
   }
 
@@ -397,9 +397,11 @@ client.on("messageCreate", async (message: Message) => {
     return closeCommand(message, claimedPosts);
   }
 
-  if (command === "!escape" || command.startsWith("!escape ")) {
+  if (command.startsWith("!escape")) {
     return escapeCommand(message);
   }
+
+  if(command.startsWith("!say"))
 
   if (commands.has(command)) {
     var cmd = commands.get(command)!!
