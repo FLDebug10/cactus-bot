@@ -84,7 +84,7 @@ async function deployCommands() {
 
   await rest.put(
     Routes.applicationCommands(client.user?.id!!),
-    { body: [(new SlashCommandBuilder().setName("register").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command, excluding \`!\`: \`example\` results in !example").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)).toJSON()] }
+    { body: [(new SlashCommandBuilder().setName("register").setDescription("Register Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command, excluding \`!\`: \`example\` results in !example").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)).toJSON()] }
   );
 
   console.log('Registered Slash Commands');
