@@ -15,6 +15,7 @@ export async function sayCommand(message: Message) {
   );
 
   if (!isModerator && !hasAllowedRole) {
+    console.warn("Tried to use !say without perms, ignoring!")
     return;
   }
 
