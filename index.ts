@@ -1,5 +1,6 @@
 import { config } from "dotenv";
-import { data, getSuggestions, getModMail, getCommands, Command } from "./db.ts";
+import { data, getSuggestions, getModMail, getCommands } from "./db.ts";
+import type { Command } from "./db.ts";
 import {
   Client,
   GatewayIntentBits,
