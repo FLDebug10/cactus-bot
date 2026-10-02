@@ -46,7 +46,8 @@ export const ALLOWED_ROLE_IDS = [
 
 const EMOJIS = [
   "<:grove:1554976275729223740>",
-  "<:grove_orb:1555207821291683950>"
+  "<:grove_orb:1555207821291683950>",
+  "<:grove_heart:1555697272099045396>"
 ]
 
 const claimedPosts = new Map<string, string>();
