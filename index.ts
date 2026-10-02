@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { data, getSuggestions, getModMail, getCommands } from "./db.ts";
+import { data, getSuggestions, getModMail, getCommands, Command } from "./db.ts";
 import {
   Client,
   GatewayIntentBits,
@@ -14,7 +14,7 @@ import {
   Interaction,
   PermissionFlagsBits
 } from "discord.js";
-import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerSlashCommand } from "./commands.ts"
+import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand } from "./commands.ts"
 
 config()
 
@@ -53,12 +53,6 @@ const REPLYS = [
   "yup, thats me!",
   "need something?"
 ]
-
-export type Command = {
-  cmd: string,
-  help: string,
-  out: string
-}
 
 
 const claimedPosts = new Map<string, string>();
@@ -158,7 +152,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   }
 
   if (interaction.isModalSubmit()) {
-
+    await registerModal(interaction, commands, DATABASE, cmdArray)
   }
 })
 

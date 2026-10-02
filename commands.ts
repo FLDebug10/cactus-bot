@@ -1,8 +1,9 @@
 // help command
 
 import { Message, PermissionFlagsBits, ChannelType, MessagePayload, EmbedBuilder, AttachmentBuilder, Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRow, ActionRowBuilder, LabelBuilder, ModalSubmitInteraction, MessageFlags } from "discord.js";
-import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, Command, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
+import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
 import Database from "better-sqlite3";
+import { Command } from "./db.ts";
 
 export async function registerSlashCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand()) return;
@@ -20,7 +21,7 @@ export async function registerSlashCommand(interaction: Interaction) {
   return await interaction.showModal(modal)
 }
 
-export async function registerModal(interaction: Interaction, commands: Map<string, Command>, db: any) {
+export async function registerModal(interaction: Interaction, commands: Map<string, Command>, db: any, cmdArray: Command[]) {
   if (!(db instanceof Database)) return
   if (!interaction.isModalSubmit()) return
 
@@ -42,6 +43,12 @@ export async function registerModal(interaction: Interaction, commands: Map<stri
       `).run(cmd, help,out)
 
       commands.set(cmd, {
+        cmd: cmd,
+        help: help,
+        out: out
+      })
+
+      cmdArray.push({
         cmd: cmd,
         help: help,
         out: out

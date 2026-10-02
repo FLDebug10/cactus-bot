@@ -1,5 +1,10 @@
 import Database from 'better-sqlite3';
-import type { Command } from './index.ts';
+
+export type Command = {
+  cmd: string,
+  help: string,
+  out: string
+}
 
 export async function data(): Promise<any> {
     const db = new Database("data/database.db")
