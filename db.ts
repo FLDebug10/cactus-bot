@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 
-export type Command = {
+export interface Command {
   cmd: string,
   help: string,
   out: string
