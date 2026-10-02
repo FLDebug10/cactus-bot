@@ -131,6 +131,8 @@ export async function helpCommand(message: any, commands: Command[]) {
 - \`!closemail\` — Closes the current Modmail conversation
 ${dyn}
 
+🌱 **Not a command?** Mention me or reply to one of my messages and I'll do my best to answer but bugs, datapacks, resource packs, JSON errors and the Handbook are all fair game.
+
 🔒 **Contributor / Staff Commands**
 \`!claim\`, \`!close\`, and \`!closemail\` are restricted to Contributors and staff.`
   );

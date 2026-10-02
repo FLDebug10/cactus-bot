@@ -16,6 +16,7 @@ import {
   PermissionFlagsBits
 } from "discord.js";
 import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand, sayCommand, unregisterSlashCommand } from "./commands.ts"
+import { handleChat } from "./chat.ts"
 
 config()
 
@@ -47,15 +48,6 @@ const EMOJIS = [
   "<:grove:1554976275729223740>",
   "<:grove_orb:1555207821291683950>"
 ]
-
-const REPLYS = [
-  "yeah?",
-  "hello!",
-  "yup, thats me!",
-  "need something?",
-  "Grove."
-]
-
 
 const claimedPosts = new Map<string, string>();
 
@@ -325,14 +317,11 @@ client.on("messageCreate", async (message: Message) => {
     }
   }
 
-  if (client.user != null ? message.mentions.has(client.user.id) : false) {
-    try {
-      let reply = REPLYS[Math.floor(Math.random() * REPLYS.length)]
-      await message.reply(reply)
-    } catch (error) {
-      console.error("Error while responding to message: ", error)
-    }
-  }
+  // CONVERSATIONAL BRAIN - the message was aimed at Grove, or replies to one
+  // of its own messages. The reply itself is sent a moment later so the
+  // command handlers below still get a shot at the message.
+
+  handleChat(message, client.user?.id ?? "", commands);
 
   if (command.startsWith("!bars")) {
     return await barsCommand(message)
