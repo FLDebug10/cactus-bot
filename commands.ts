@@ -1,6 +1,6 @@
 // help command
 
-import { Message, PermissionFlagsBits, ChannelType, MessagePayload, EmbedBuilder, AttachmentBuilder, Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRow, ActionRowBuilder, LabelBuilder, ModalSubmitInteraction, MessageFlags } from "discord.js";
+import { Message, PermissionFlagsBits, ChannelType, EmbedBuilder, AttachmentBuilder, type Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, MessageFlags } from "discord.js";
 import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
 import Database from "better-sqlite3";
 import type { Command } from "./db.ts";
