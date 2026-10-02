@@ -12,7 +12,7 @@ import {
   REST,
   SlashCommandBuilder,
   SlashCommandStringOption,
-  Interaction,
+  type Interaction,
   PermissionFlagsBits
 } from "discord.js";
 import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerModal, registerSlashCommand } from "./commands.ts"
