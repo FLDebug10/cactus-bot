@@ -1,9 +1,66 @@
 // help command
 
-import { Message, PermissionFlagsBits, ChannelType, MessagePayload, EmbedBuilder, AttachmentBuilder } from "discord.js";
-import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
+import { Message, PermissionFlagsBits, ChannelType, MessagePayload, EmbedBuilder, AttachmentBuilder, Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRow, ActionRowBuilder, LabelBuilder, ModalSubmitInteraction, MessageFlags } from "discord.js";
+import { ALLOWED_ROLE_IDS, CLAIMED_TAG_ID, client, CLOSED_TAG_ID, Command, DATABASE, MODMAIL_FORUM_ID, PENDING_REVIEW_TAG_ID } from "./index.ts"
+import Database from "better-sqlite3";
 
-export async function helpCommand(message: any) {
+export async function registerSlashCommand(interaction: Interaction) {
+  if (!interaction.isChatInputCommand()) return;
+
+  const modal = new ModalBuilder().setCustomId("register").setTitle("Register Command")
+  const out = new TextInputBuilder().setCustomId("out").setRequired(true).setStyle(TextInputStyle.Paragraph).setPlaceholder("Example Output...")
+  const help = new TextInputBuilder().setCustomId("help").setRequired(true).setStyle(TextInputStyle.Paragraph).setPlaceholder("Helpful Description...")
+
+  const command_default = interaction.options.getString("command") ?? ""
+  
+  const command = new TextInputBuilder().setCustomId("cmd").setStyle(TextInputStyle.Short).setValue(command_default).setPlaceholder("!command").setRequired(true).setMinLength(2).setMaxLength(32)
+
+  modal.addLabelComponents(new LabelBuilder().setLabel("Command").setTextInputComponent(command), new LabelBuilder().setLabel("Command Output").setTextInputComponent(out), new LabelBuilder().setLabel("Help Description").setTextInputComponent(help))
+
+  return await interaction.showModal(modal)
+}
+
+export async function registerModal(interaction: Interaction, commands: Map<string, Command>, db: any) {
+  if (!(db instanceof Database)) return
+  if (!interaction.isModalSubmit()) return
+
+  if (interaction.customId === "register") {
+    const out = interaction.fields.getTextInputValue("out")
+    const help = interaction.fields.getTextInputValue("help")
+    const cmd = "!" + interaction.fields.getTextInputValue("cmd").trim().toLowerCase().replace(/^!+/, "")
+
+    if (!(/^![a-z0-9_-]+$/.test(cmd))) {
+      return await interaction.reply({
+        content: "Command name isn't valid. (May only include letters, numbers, `_` and `-`)",
+        flags: MessageFlags.Ephemeral,
+      })
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO commands (cmd, help, out) VALUES (?, ?, ?)
+      `).run(cmd, help,out)
+
+      commands.set(cmd, {
+        cmd: cmd,
+        help: help,
+        out: out
+      })
+    } catch (error) {
+      console.error(error)
+      return
+    }
+
+    return await interaction.reply({
+      content: `Registered Command ${cmd}`,
+      flags: MessageFlags.Ephemeral
+    })
+  }
+}
+
+export async function helpCommand(message: any, commands: Command[]) {
+  var dyn = commands.map(cmd => `- \`${cmd.cmd}\` — ${cmd.help}`).join("\n")
+
   return message.reply(
 `<:grove:1554976275729223740> **List of Commands:**
 
@@ -19,6 +76,7 @@ export async function helpCommand(message: any) {
 - \`!claim\` — Claims a suggestion post and marks it as being handled
 - \`!close\` — Closes a <#1533408806833229834> post, locks it and adds the \`Implemented\` tag
 - \`!closemail\` — Closes the current Modmail conversation
+${dyn}
 
 🔒 **Contributor / Staff Commands**
 \`!claim\`, \`!close\`, and \`!closemail\` are restricted to Contributors and staff.`
@@ -340,8 +398,8 @@ export async function claimCommand(message: any, claimedPosts: Map<string, strin
     );
 
     DATABASE.prepare(`
-      INSERT INTO suggestions (thread, user) VALUES ('${thread.id}', '${message.author.id}')
-    `).run()
+      INSERT INTO suggestions (thread, user) VALUES (?, ?)
+    `).run(thread.id, message.author.id)
 
     return message.reply(
       `🛠️ This post has been claimed by ${message.author}.`
@@ -420,8 +478,8 @@ export async function closeCommand(message: any, claimedPosts: Map<string, strin
 
     DATABASE.prepare(`
       DELETE FROM suggestions
-      WHERE thread = ${thread.id}
-    `).run()
+      WHERE thread = ?
+    `).run(thread.id)
 
     await message.reply(
       "🔒 This post has been closed."
@@ -490,13 +548,17 @@ export async function closeMailCommand(message: any, modmailThreads: Map<string,
       );
     } catch {}
 
-    modmailThreads.delete(thread.id);
-    modmailUsers.delete(userId);
+    try {
+      DATABASE.prepare(`
+        DELETE FROM modMail 
+        WHERE user = ?
+      `).run(userId)
 
-    DATABASE.prepare(`
-      DELETE FROM modMail 
-      WHERE user = ${userId}
-    `).run()
+      modmailThreads.delete(thread.id);
+      modmailUsers.delete(userId);
+    } catch (error) {
+      console.error(error)
+    }
 
     await message.reply(
       "📪 Modmail conversation closed."

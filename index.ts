@@ -1,20 +1,29 @@
 import { config } from "dotenv";
-import { data, getSuggestions, getModMail } from "./db.ts";
+import { data, getSuggestions, getModMail, getCommands } from "./db.ts";
 import {
   Client,
   GatewayIntentBits,
-  PermissionFlagsBits,
   ChannelType,
   Partials,
   ActivityType,
-  Message
+  Message,
+  Routes,
+  REST,
+  SlashCommandBuilder,
+  SlashCommandStringOption,
+  Interaction,
+  PermissionFlagsBits
 } from "discord.js";
-import Database from "better-sqlite3";
-import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand } from "./commands.ts"
+import { badgesCommand, barsCommand, claimCommand, closeCommand, closeMailCommand, compCommand, escapeCommand, formatCommand, handbookCommand, helpCommand, killDrizzoCommand, killFLDCommand, mediaCommand, parserCommand, rbrCommand, rdsCommand, registerSlashCommand } from "./commands.ts"
 
 config()
 
 const TOKEN = process.env.TOKEN;
+
+if (TOKEN == null) {
+  console.error("Didn't find token!")
+  process.exit(1);
+}
 
 export const DATABASE = await data();
 
@@ -45,6 +54,12 @@ const REPLYS = [
   "need something?"
 ]
 
+export type Command = {
+  cmd: string,
+  help: string,
+  out: string
+}
+
 
 const claimedPosts = new Map<string, string>();
 
@@ -52,12 +67,15 @@ const modmailUsers = new Map<string, string>();
 
 const modmailThreads = new Map<string, string>();
 
+const commands = new Map<string, Command>();
+let cmdArray: Command[] = []
+
 export const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessages
   ],
 
   partials: [
@@ -65,10 +83,23 @@ export const client = new Client({
   ],
 });
 
+async function deployCommands() {
+  const rest = new REST({ version: '10' })
+    .setToken(TOKEN!!);
+
+  await rest.put(
+    Routes.applicationCommands(client.user?.id!!),
+    { body: [(new SlashCommandBuilder().setName("register").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command, excluding \`!\`: \`example\` results in !example").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)).toJSON()] }
+  );
+
+  console.log('Registered Slash Commands');
+}
+
 
 client.once("clientReady", async () => {
   let sug = await getSuggestions(DATABASE)
   let modMail = await getModMail(DATABASE)
+  cmdArray = await getCommands(DATABASE)
 
   for (let thread of sug) {
     claimedPosts.set(thread.thread, thread.user)
@@ -79,9 +110,15 @@ client.once("clientReady", async () => {
     modmailUsers.set(thread.user, thread.thread)
   }
 
+  for (let cmd of cmdArray) {
+    commands.set(cmd.cmd, cmd)
+  }
+
   client.user?.setActivity("Overgrown's Origins", {
     type: ActivityType.Playing,
   });
+
+  await deployCommands()
 
   console.log(`Bot online as ${client.user?.tag}`);
 });
@@ -114,6 +151,16 @@ client.on("threadCreate", async (thread: any) => {
     );
   }
 });
+
+client.on("interactionCreate", async (interaction: Interaction) => {
+  if (interaction.isChatInputCommand()) {
+    await registerSlashCommand(interaction)
+  }
+
+  if (interaction.isModalSubmit()) {
+
+  }
+})
 
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
@@ -158,19 +205,23 @@ client.on("messageCreate", async (message: Message) => {
           }
         });
 
-        modmailUsers.set(
-          message.author.id,
-          thread.id
-        );
+        try {
+          DATABASE.prepare(`
+            INSERT INTO modMail (thread, user) VALUES (?, ?)
+          `).run(thread.id, message.author.id)
 
-        modmailThreads.set(
-          thread.id,
-          message.author.id
-        );
+          modmailUsers.set(
+            message.author.id,
+            thread.id
+          );
 
-        DATABASE.prepare(`
-          INSERT INTO modMail (thread, user) VALUES ('${thread.id}', '${message.author.id}')
-        `).run()
+          modmailThreads.set(
+            thread.id,
+            message.author.id
+          );
+        } catch (error) {
+          console.error(error)
+        }
       }
 
       let forwardedMessage =
@@ -321,7 +372,7 @@ client.on("messageCreate", async (message: Message) => {
   }
 
   if (command === "!help") {
-    return helpCommand(message);
+    return helpCommand(message, cmdArray);
   }
 
   if (command === "!handbook" || command === "!wiki") {
@@ -350,6 +401,12 @@ client.on("messageCreate", async (message: Message) => {
 
   if (command === "!escape" || command.startsWith("!escape ")) {
     return escapeCommand(message);
+  }
+
+  if (commands.has(command)) {
+    var cmd = commands.get(command)!!
+    
+    return message.reply(cmd.out)
   }
 });
 
