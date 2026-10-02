@@ -84,8 +84,8 @@ async function deployCommands() {
   await rest.put(
     Routes.applicationCommands(client.user?.id!!),
     { body: [
-      (new SlashCommandBuilder().setName("register").setDescription("Register Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild | PermissionFlagsBits.ModerateMembers)).toJSON(),
-      (new SlashCommandBuilder().setName("unregister").setDescription("Unregister Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(true).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild | PermissionFlagsBits.ModerateMembers)).toJSON()
+      (new SlashCommandBuilder().setName("register").setDescription("Register Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(false).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)).toJSON(),
+      (new SlashCommandBuilder().setName("unregister").setDescription("Unregister Custom Commands").addStringOption(new SlashCommandStringOption().setRequired(true).setDescription("Name of the Command").setName("command").setMinLength(2).setMaxLength(32)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)).toJSON()
     ] }
   );
 
