@@ -12,7 +12,7 @@ Grove is a group effort:
 - **FLD10** (`_fld10_`) hosts Grove ("feeds him"), set up the repo, and ported the old Carl-bot commands.
 - **Overgrown** (`0vergrown`) gave Grove its brain and personality, on top of Drizzo and FLD10's work.
 
-Grove knows all three by their Discord IDs (`CREW` in `src/config.ts`) and greets them as family.
+Grove knows all three by their Discord IDs (`CREW` in `src/config.ts`) and greets them as family. Drizzo and FLD10 are a couple, so Grove's two **dads** are the two of them.
 
 ## Who Grove is
 
@@ -27,6 +27,8 @@ Grove's answers about itself all come from one canon, so it never contradicts it
 - A cactus lived on the server before Grove. Grove has never been a cactus.
 - It can't count past seven in its head, so it bounces on a calculator for bigger sums (and gets them right).
 - It loves D&D, where slimes are called oozes: its favorite class is druid, its favorite species is plasmoid (ooze people), and the gelatinous cube is its "famous cousin".
+- It knows Pokémon too, where **Ditto** looks the most like it does.
+- It finishes sentences: famous ones get their real ending, anything else gets whatever comes out of its moss.
 - It has no opinions about politics. Ask about Donald Trump and you get an orange joke or a true orange fact instead.
 
 ## Running it
@@ -130,7 +132,7 @@ Grove never pings anyone.
 - **New facts**: `src/brain/content/knowledge.ts` (mods, origins, server, and Grove's own canon) or the glossary in `src/brain/respond/help.ts`.
 - **Things Grove can do**: `ABILITIES` in `src/brain/content/lexicon.ts` answers "can you X?", "do you X?" and "X!" all at once.
 - **New slang**: add a term to `SLANG` in `src/brain/content/slang.ts`, with its meaning and lines for each way it gets used (asked, told, said about Grove, said about yourself). Put phrases before the single words inside them.
-- **D&D and fantasy**: `src/brain/content/fantasy.ts`. **Dumb questions and orange facts**: `src/brain/content/silly.ts`. `test/content.test.ts` checks every line there for dashes and semicolons.
+- **D&D and fantasy**: `src/brain/content/fantasy.ts`. **Dumb questions and orange facts**: `src/brain/content/silly.ts`. **Sentences Grove can finish**: `src/brain/content/sentences.ts`. `test/content.test.ts` checks every line there for dashes and semicolons.
 - **Other words**: `src/brain/content/words.ts` and `lexicon.ts`. If you add a word to `CORRECTION_TARGETS`, run `npm run speller`.
 - **See what Grove got wrong**: staff can run `!misses` in Discord.
 - Add a test next to the ones in `test/conversation.test.ts`, and try it out with `npm run chat`.

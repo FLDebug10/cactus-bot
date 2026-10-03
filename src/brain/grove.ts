@@ -43,7 +43,7 @@ const CONTINUATION_OK = new Set<IntentId>([
   "ask_compliment", "how_are_you", "how_is_day", "what_doing", "ask_thinking", "ask_feeling", "ask_identity",
   "ask_is_bot", "ask_alive", "ask_gender", "ask_age", "ask_name", "ask_creator", "ask_species", "ask_home",
   "ask_food", "ask_sleep", "ask_relationship", "ask_like_me", "ask_remember", "tell_name", "ask_favorite",
-  "ask_like", "ask_ability", "joke", "fact", "coin", "dice", "choose", "math", "perform", "affection",
+  "ask_like", "ask_ability", "joke", "fact", "coin", "dice", "choose", "math", "perform", "affection", "finish_sentence",
   "aggression", "help", "problem", "suggestion", "media", "jam_info", "jam_submit", "jam_chat", "define",
   "download", "versions", "install", "commands", "contact_staff", "origin_list", "best_origin", "how_to",
   "where_to", "distress", "laugh", "share_feeling", "claim_about_grove", "why", "channels", "compat",

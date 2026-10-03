@@ -19,7 +19,7 @@ export type IntentId =
   | "ask_remember" | "tell_name" | "ask_favorite" | "ask_like" | "ask_ability" | "ask_attribute"
   | "insult" | "compliment" | "ask_insult" | "ask_compliment" | "love" | "hate" | "claim_about_grove" | "state_attribute"
   | "affection" | "aggression"
-  | "joke" | "fact" | "coin" | "dice" | "choose" | "math" | "rate" | "perform" | "slang"
+  | "joke" | "fact" | "coin" | "dice" | "choose" | "math" | "rate" | "perform" | "slang" | "finish_sentence"
   | "help" | "problem" | "suggestion" | "media" | "jam_info" | "jam_submit" | "jam_chat"
   | "define" | "download" | "versions" | "install" | "commands" | "contact_staff"
   | "origin_list" | "best_origin" | "server_info" | "how_to" | "where_to"
@@ -240,16 +240,40 @@ const dumbQuestion: FrameTest = (core, _tokens, reading, _topics, clause): Slots
   return index >= 0 ? { kind: "classic", index: String(index) } : null;
 };
 
+// "finish the sentence. "the quick brown fox..."" and "what comes after
+// 'no more'". The part they gave comes back as the fragment, minus the ask:
+// the reading has already dropped the quotes and the trailing dots.
+const FINISH_VERB = /\b(finish|complete|end)( off)* (the|this|that|my|a|an) (sentence|phrase|quote|line|song|lyric|thought|rhyme)\b/;
+const FINISH_WHAT = /\bwhat (comes|goes|happens)( (after|next|before))?\b/;
+const FINISH_HOW = /\bhow (do|does) (it|this|the sentence|the line|the phrase|that) end\b/;
+
+const finishSentence: FrameTest = (_core, _tokens, reading) => {
+  const ask = FINISH_VERB.exec(reading.text) ?? FINISH_HOW.exec(reading.text) ?? FINISH_WHAT.exec(reading.text);
+  if (ask === null) return null;
+  return { fragment: safeFragment(reading.text.slice(ask.index + ask[0].length)) };
+};
+
+// What someone left hanging: their own words after the ask, capped so a whole
+// message can never become the answer.
+function safeFragment(tail: string): string {
+  return tail.trim().replace(/^grove\b/, "").trim().split(" ").slice(0, 12).join(" ");
+}
+
 // Dungeons & Dragons, where slimes are oozes, and slimes in other games and
 // stories. "dnd" on its own can be Discord's do not disturb.
 const DND_STRONG = /\b(dnd|dungeon master|gelatinous cubes?|ochre jell(y|ies)|black puddings?|gr[ae]y oozes?|oozes?|owlbears?|beholders?|mind flayers?|illithids?|tarrasques?|tieflings?|dragonborn|aasimar|tabaxi|kenku|plasmoids?|warforged|firbolgs?|tortles?|aarakocra|harengon|genasi|paladins?|warlocks?|sorcerers?|artificers?|druids?|(nat|natural) (20|1|one)|roll(ing)? for initiative|saving throws?|spell slots?|cantrips?|wild ?shape|multi ?class(ing)?|tpk|sneak attack|eldritch blast|death saves?|session zero|(lawful|chaotic) (good|neutral|evil)|true neutral|5e|ttrpg|tabletop|(be|wanna be|want to be) (my|our) dm|what alignment|your alignment|alignment are you)\b/;
 const DND_STATUS = /\b(on|set to|turn on|turned on|turn off|my status is|status) dnd\b/;
 const FANTASY_SLIME_NAMES = /\b(rimuru|reincarnated as a slime|tensura|slime ranchers?|plorts?|metal slimes?|king slimes?|dragon quest)\b/;
 const FANTASY_PLACES = /\b(other games?|games|video games?|anime|manga|movies?|shows?|books?|stories|fantasy|cartoons?|famous slimes?|other slimes|terraria)\b/;
+// Pokémon, which has slimes in it too. "ditto" on its own means "same thing",
+// so that word only counts when someone actually asked about it.
+const POKEMON_NAMES = /\b(pokemon|pok[eé]mon|poke ?mon|bulbasaur|charmander|squirtle|pikachu|ditto|dittos|jigglypuff|eevee|gengar|snorlax|tangela|meowth|poliwag|politoed|weezing|koffing|grimer|exeggcute|gastly|drifloon|phanpy)\b/;
+const POKEMON_ASKED = /\b(what|who|which|tell me about|explain|do you know)\b/;
 
 const fantasy: FrameTest = (_core, _tokens, reading) => {
   const text = reading.text;
   if (DND_STRONG.test(text) && !(DND_STATUS.test(text) && !/\bdnd (class|campaign|character|game|session)\b/.test(text))) return { kind: "dnd" };
+  if (POKEMON_NAMES.test(text) && (reading.question || POKEMON_ASKED.test(text))) return { kind: "pokemon" };
   if (FANTASY_SLIME_NAMES.test(text)) return { kind: "slimes" };
   if (/\bslimes?\b/.test(text) && FANTASY_PLACES.test(text) && reading.question) return { kind: "slimes" };
   return null;
@@ -327,6 +351,8 @@ const FRAMES: readonly Frame[] = [
 
   ["fantasy", fantasy, 0.9],
 
+  ["finish_sentence", finishSentence, 0.9],
+
   ["more", all(shortClause(6), whole(/^(tell me more|more|go on|and then|and then what|then what|what else|keep going|continue|what happened next|say more|more please)$/)), 0.85],
 
   ["doubt", all(shortClause(6), whole(/^(really|are you sure|you sure|seriously|is that true|is it true|are you serious|you serious|no way|wait really|really though|for real)$/)), 0.8],
@@ -376,7 +402,7 @@ const FRAMES: readonly Frame[] = [
 
   ["ask_origin_story", re(/\bhow (were|where|was|did) (you|grove) (made|born|created|built|come to be|come to life|get made|get here|start|appear|begin)\b|\bwhere did (you|grove) come from\b|\b(your|grove) (origin story|backstory|back story|lore|life story)\b|\bhow did (you|grove) come to be\b|\bwhere were you born\b|\bwhat is your (origin|backstory|story)\b|\bhow are you (made|alive)\b/), 0.9],
 
-  ["ask_creator", re(/\b(do you have|you have|have you got|got) (a |any )?(?<kind>family|siblings|sibling|brothers?|sisters?|parents|mom|mum|dad|mother|father|kids|children|babies|baby slimes)\b|\bwho (is|are) your (family|siblings|brothers|sisters)\b|\b(tell me about|what about) your family\b/), 0.9],
+  ["ask_creator", re(/\b(do you have|you have|have you got|got) (a |any )?(?<kind>family|siblings|sibling|brothers?|sisters?|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|fathers?|kids|children|babies|baby slimes)\b|\bwho (is|are) your (?<kind>family|siblings|brothers|sisters|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|father|fathers)\b|\b(tell me about|what about) your family\b/), 0.9],
 
   ["ask_creator", re(/\bwho (made|created|built|coded|programmed|owns|wrote|designed|drew|invented) (you|grove|this bot|the bot|this)\b|\bwho is your (creator|owner|maker|dev|developer|dad|mom|mother|father|parent|parents|daddy|mommy)\b/), 0.95],
 
@@ -779,7 +805,7 @@ const WEIGHT: Partial<Record<IntentId, number>> = {
   ask_like_me: 43, ask_remember: 43, tell_name: 43, ask_favorite: 42, ask_like: 42, ask_ability: 42,
   ask_attribute: 40, claim_about_grove: 40, ask_feeling: 41, ask_thinking: 41,
   how_is_day: 41, how_are_you: 40, what_doing: 40, share_feeling: 38,
-  joke: 39, fact: 39, coin: 39, dice: 39, choose: 39, math: 39, rate: 38, perform: 38,
+  joke: 39, fact: 39, coin: 39, dice: 39, choose: 39, math: 39, finish_sentence: 39, rate: 38, perform: 38,
   affection: 37, aggression: 37, slang: 30,
   apologize: 35, thank: 33, farewell: 32, greet: 20, laugh: 25, agree: 22, disagree: 22, ack: 15,
   question: 18, statement: 10,

@@ -1,4 +1,5 @@
 import { ageWords, FUN_FACTS, JOKES, TNT_RECIPE_IMAGE } from "../content/knowledge.ts";
+import { FAMOUS_SENTENCES, MADE_UP_ENDINGS, SENTENCE_LEADS } from "../content/sentences.ts";
 import { DUMB_QUESTION_MEANING, DUMB_QUESTIONS, MY_DUMB_QUESTIONS, ORANGE_FACTS } from "../content/silly.ts";
 import { SLANG_BY_ID, type SlangUse } from "../content/slang.ts";
 import { table } from "../content/table.ts";
@@ -6,7 +7,7 @@ import { solveMath, spokenValue } from "../understand/arithmetic.ts";
 import type { IntentId } from "../understand/intents.ts";
 import { EMOJI, type Reply, type Responder, safeWord, type Turn } from "./turn.ts";
 
-// Games, jokes, sums, slang and silly questions.
+// Games, jokes, sums, slang, finished sentences and silly questions.
 
 const joke: Responder = turn => ({
   text: turn.picker.pick("joke", JOKES),
@@ -232,4 +233,22 @@ const dumbQuestion: Responder = turn => {
   }
 };
 
-export const FUN: Partial<Record<IntentId, Responder>> = { joke, fact, coin, dice, choose, math, rate, perform, slang, bomb, dumb_question: dumbQuestion };
+// "finish the sentence. "the quick brown fox..."": the famous ones get their
+// real ending, everything else gets whatever Grove's moss comes up with.
+const finishSentence: Responder = turn => {
+  const said = (turn.intent.slots["fragment"] ?? "").trim();
+  // Nothing to finish: Grove starts one itself, famous or not.
+  const fragment = said.length === 0 ? turn.picker.pick("sentence.lead", SENTENCE_LEADS) : said;
+  const known = FAMOUS_SENTENCES.find(sentence => sentence.match.test(fragment));
+  if (known === undefined) {
+    return {
+      text: `${fragment} ${turn.picker.pick("sentence.end", MADE_UP_ENDINGS)}`,
+      gloss: "that sentence isn't famous, so i finished it with whatever came into my head",
+      act: "finish_sentence",
+      feel: "chat",
+    };
+  }
+  return { text: `${fragment} ${known.end}`, gloss: known.gloss, act: "finish_sentence", feel: "chat" };
+};
+
+export const FUN: Partial<Record<IntentId, Responder>> = { joke, fact, coin, dice, choose, math, rate, perform, slang, bomb, dumb_question: dumbQuestion, finish_sentence: finishSentence };

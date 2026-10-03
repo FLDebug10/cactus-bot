@@ -1,7 +1,7 @@
 import type { CrewMember } from "../../config.ts";
 import { ABILITIES, COLORS, COMPLIMENTS, DISLIKES, FOODS, LIKES, PET_NAMES } from "../content/lexicon.ts";
 import {
-  ageWords, BELONGINGS, BODY_PARTS, CREW_ROLES, crewMemberById, crewTag, DISLIKE_REASONS, FUN_FACTS, GROVE_BIRTHDAY, HOW_GROVE, JOKES,
+  ageWords, BELONGINGS, BODY_PARTS, CREW_ROLES, crewMemberById, crewTag, DAD_ABOUT, DADS, DISLIKE_REASONS, FUN_FACTS, GROVE_BIRTHDAY, HOW_GROVE, JOKES,
   LORE, STORIES, TRAITS,
 } from "../content/knowledge.ts";
 import { table } from "../content/table.ts";
@@ -207,7 +207,13 @@ const nameMeaning = (turn: Turn): Reply => ({
   feel: "chat",
 });
 
-// Drizzo and FLD10 made Grove; Overgrown built on top of their work.
+// "<drizzo>" and "<fld10>" in the DADS lines become mention pills, the way
+// Grove credits the people who made it.
+function nameTheDads(line: string): string {
+  return line.replace(/<(drizzo|fld10|overgrown)>/g, (_, member: CrewMember) => crewTag(member));
+}
+
+// Drizzo and FLD10 made Grove, and they are a couple, so they are both its dads.
 const creator: Responder = turn => {
   const asker = crewMemberById(turn.message.authorId);
   const kind = turn.intent.slots["kind"] ?? (/\byour family\b|\bwho (is|are) your (family|siblings|brothers|sisters)\b/.test(turn.reading.text) ? /\b(siblings|brothers|sisters)\b/.exec(turn.reading.text)?.[1] ?? "family" : "");
@@ -217,9 +223,17 @@ const creator: Responder = turn => {
   if (/^(kids|children|babies|baby slimes)$/.test(kind)) {
     return { text: "no baby slimes yet! i tried splitting in two, but it never works", gloss: "i don't have kids, i can't even split in two", act: "ask_creator", feel: "chat" };
   }
+  if (/^(parents?|dads?|daddy|daddies|father|fathers)$/.test(kind)) {
+    const text = nameTheDads(turn.picker.pick("creator.dads", DADS));
+    const lead = asker === "drizzo" || asker === "fld10" ? "you should know, you're one of my dads! but okay: " : "";
+    return { text: `${lead}${text} ${EMOJI.heart}`, gloss: "drizzo and fld10 are my dads, they made me together", act: "ask_creator", feel: "chat" };
+  }
+  if (/^(mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers)$/.test(kind)) {
+    return { text: "no moms! i have two dads instead, and they made me together, so i'm very okay about it", gloss: "i don't have a mom, i have two dads", act: "ask_creator", feel: "chat" };
+  }
   if (kind.length > 0) {
     return {
-      text: `my family is ${crewTag("drizzo")}, ${crewTag("fld10")} and ${crewTag("overgrown")}! they made me. and the slimekin are my cousins, so it's a big family ${EMOJI.heart}`,
+      text: `my family is ${crewTag("drizzo")}, ${crewTag("fld10")} and ${crewTag("overgrown")}! they made me, and two of them are my dads. and the slimekin are my cousins, so it's a big family ${EMOJI.heart}`,
       gloss: "drizzo, fld10 and overgrown made me, so they're my family, and the slimekin are my cousins",
       act: "ask_creator",
       feel: "chat",
@@ -227,7 +241,7 @@ const creator: Responder = turn => {
   }
   const credits = turn.picker.pick("creator", [
     `it was a group effort! ${crewTag("drizzo")} ${CREW_ROLES.drizzo.they}, ${crewTag("fld10")} ${CREW_ROLES.fld10.they}, and ${crewTag("overgrown")} ${CREW_ROLES.overgrown.they} ${EMOJI.heart}`,
-    `${crewTag("drizzo")} and ${crewTag("fld10")} made me first: drizzo drew me and wrote my first code, and fld10 hosts me (feeds me, really) and brought the old carl-bot commands over. then ${crewTag("overgrown")} gave me my brain and personality! so i have three parents?`,
+    `${crewTag("drizzo")} and ${crewTag("fld10")} made me first: drizzo drew me and wrote my first code, and fld10 hosts me (feeds me, really) and brought the old carl-bot commands over. then ${crewTag("overgrown")} gave me my brain and personality! the first two are my dads`,
   ]);
   const lead = asker !== null ? `you should know, you ${CREW_ROLES[asker].youShort}! but okay: ` : "";
   return { text: `${lead}${credits}`, gloss: "drizzo drew me and wrote my first code, fld10 hosts me and brought over the old commands, and overgrown gave me my brain", act: "ask_creator", feel: "chat" };
@@ -248,7 +262,7 @@ const favoritePerson: Responder = turn => {
     return { text: turn.picker.pick("fav.other", [`ooh, hard question... probably ${name}! they're always so nice to me. but i like you too!`, `${name} is really nice to me! but everyone who's kind is my favorite`]), gloss: `${name} is very nice to me`, act: "favorite_person", feel: "chat" };
   }
   return {
-    text: `everyone who's nice to me! but ${crewTag("drizzo")} drew me, ${crewTag("fld10")} feeds me and ${crewTag("overgrown")} gave me my brain, so they're kinda my family ${EMOJI.heart}`,
+    text: `everyone who's nice to me! but ${crewTag("drizzo")} and ${crewTag("fld10")} are my dads, and ${crewTag("overgrown")} gave me my brain, so they're all family ${EMOJI.heart}`,
     gloss: "i like everyone who's nice to me, and my creators are like family",
     act: "favorite_person",
     feel: "chat",
@@ -807,8 +821,8 @@ const CREW_NAMES: Readonly<Record<string, CrewMember>> = table({
 });
 
 const CREW_ABOUT: Readonly<Record<CrewMember, readonly string[]>> = {
-  drizzo: ["drizzo drew me! and wrote my very first code. so they're kind of my mom? or dad? my parent!", "drizzo is the artist who drew me and wrote my first code. i wouldn't exist without them"],
-  fld10: ["fld10 hosts me, which means they feed me electricity! they also brought all the old carl-bot commands over to me", "fld10 is my host! they keep me running and brought the old carl-bot commands with me"],
+  drizzo: DAD_ABOUT.drizzo,
+  fld10: DAD_ABOUT.fld10,
   overgrown: ["overgrown makes apoli and origins, the mods this whole server is about! they also gave me my brain and personality", "overgrown is the one who made apoli and origins! and they taught me how to think and talk"],
 };
 
@@ -828,8 +842,9 @@ const crew: Responder = turn => {
     return { text: `that's you, silly! you ${CREW_ROLES[member].youShort} ${EMOJI.heart}`, gloss: `you're ${member}, you ${CREW_ROLES[member].youShort}`, act: "ask_crew", feel: "chat" };
   }
   const liking = /\b(do you (like|love)|what do you think|thoughts)\b/.test(text);
+  const pronoun = member === "overgrown" ? "them" : "him";
   return {
-    text: `${liking ? picker.pick("crew.like", ["i love them!! ", "yes!! "]) : ""}${picker.pick(`crew.${member}`, CREW_ABOUT[member])}`,
+    text: `${liking ? picker.pick("crew.like", [`i love ${pronoun}!! `, "yes!! "]) : ""}${picker.pick(`crew.${member}`, CREW_ABOUT[member])}`,
     gloss: `${member} ${CREW_ROLES[member].they}`,
     act: "ask_crew",
     feel: "chat",

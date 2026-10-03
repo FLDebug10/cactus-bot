@@ -138,6 +138,9 @@ export const CLASS_ADVICE: readonly string[] = [
 
 // Slimes outside minecraft. Grove is proud of every one of them.
 export const FANTASY_SLIMES: readonly Entry[] = [
+  { match: /\bdittos?\b/, text: "ditto! it's the pokemon that looks the most like me. it's a pink blob of jelly that turns into whatever it copies, and it copies itself when it sees itself, which is why there are so many" },
+  { match: /\bpoliwags?\b|\bpolitoed\b/, text: "poliwag is a pokemon that's basically a round blue slime with a big swirl on its belly. it bounces on its tail. we are clearly related" },
+  { match: /\b(weezing|koffing|grimer|exeggcute|gastly|drifloon|phanpy)\b/, text: "there's a whole family of blob pokemon! weezing is a cloud of gas, drifloon is a balloon, and me i'm a mossy slime. we all got the round thing going on" },
   { match: /\brimuru\b|\breincarnated as a slime\b|\btensura\b/, text: "rimuru! from that time i got reincarnated as a slime. a guy gets reincarnated as a slime and becomes super powerful. honestly relatable. except the super powerful part" },
   { match: /\bslime ranchers?\b|\bplorts?\b/, text: "slime rancher is a game where you collect slimes on a faraway planet. they eat food and make plorts. i'm not sure how i feel about being ranched, but they look happy" },
   { match: /\bmetal slimes?\b/, text: "metal slimes are super rare in dragon quest. they run away really fast and give tons of xp if you catch one. i run away from frogs really fast, so i get it" },
@@ -147,3 +150,14 @@ export const FANTASY_SLIMES: readonly Entry[] = [
   { match: /\bmagma cubes?\b/, text: "magma cubes are the nether's slimes! they're my hot cousins. we don't hug, for obvious reasons" },
   { match: /\b(slimes?|oozes?|blobs?)\b/, text: "slimes are everywhere in fantasy! dragon quest's slime is basically a celebrity, there's an anime about a slime named rimuru, slime rancher is a whole game about us, terraria has a king slime, and in d&d we're called oozes" },
 ];
+
+// Pokémon, for "what is a ditto?" and anyone else who asks about the creatures
+// Grove looks most like.
+export const POKEMON_ABOUT: readonly string[] = [
+  "pokemon! you catch little monsters in balls and make them fight for you. there are about a thousand of them, and a few of them are basically slimes",
+  "pokemon are the monsters you catch and train. some of them are slimes! ditto is the one that looks most like me, except pink and with no leaf",
+];
+
+// "are there slimes in pokemon?": yes, and Grove has opinions.
+export const POKEMON_SLIMES: string =
+  "yes! pokemon is full of blob monsters. ditto is the one that looks the most like me, poliwag is a round blue one with a big swirl on its belly, and weezing is a cloud of gas with a face on it. i'm still the best one";

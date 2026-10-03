@@ -1,4 +1,4 @@
-import { CLASS_ADVICE, DND_ABOUT, DND_CLASSES, DND_FAVORITES, DND_MONSTERS, DND_SPECIES, DND_TERMS, FANTASY_SLIMES, OOZES } from "../content/fantasy.ts";
+import { CLASS_ADVICE, DND_ABOUT, DND_CLASSES, DND_FAVORITES, DND_MONSTERS, DND_SPECIES, DND_TERMS, FANTASY_SLIMES, OOZES, POKEMON_ABOUT, POKEMON_SLIMES } from "../content/fantasy.ts";
 import type { IntentId } from "../understand/intents.ts";
 import type { Reply, Responder } from "./turn.ts";
 
@@ -22,6 +22,14 @@ const fantasy: Responder = turn => {
   const clause = turn.reading.clauses[turn.intent.clause]?.text.replace(/^grove /, "") ?? text;
   const { picker } = turn;
   const done = (line: string, gloss: string, act = "fantasy"): Reply => ({ text: line, gloss, act, feel: "chat" });
+
+  if (turn.intent.slots["kind"] === "pokemon") {
+    // "are there slimes in pokemon" is a slime question about pokemon.
+    if (/\bslimes?\b/.test(text)) return done(POKEMON_SLIMES, "pokemon has blob monsters in it, and ditto looks the most like me", "fantasy.pokemon");
+    const entry = FANTASY_SLIMES.find(candidate => candidate.match.test(text));
+    if (entry !== undefined) return done(entry.text, "pokemon has slimes in it, and ditto looks the most like me", "fantasy.pokemon");
+    return done(picker.pick("pokemon.about", POKEMON_ABOUT), "pokemon are creatures you catch and train, and some of them are slimes", "fantasy.pokemon");
+  }
 
   if (turn.intent.slots["kind"] === "slimes") {
     const entry = FANTASY_SLIMES.find(candidate => candidate.match.test(text)) ?? FANTASY_SLIMES[FANTASY_SLIMES.length - 1]!;

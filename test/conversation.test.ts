@@ -346,6 +346,42 @@ describe("silly questions", () => {
     assert.match(new Channel().say("drizzo", "grove who is drizzo").text ?? "", /that's you/);
   });
 
+  it("calls drizzo and fld10 its dads, and has no mom", () => {
+    const channel = new Channel();
+    const parents = channel.say("gus", "grove who are your parents?");
+    assert.equal(parents.act, "ask_creator");
+    assert.match(parents.text ?? "", /dads/);
+    for (const member of ["drizzo", "fld10"] as const) assert.match(parents.text ?? "", new RegExp(CREW[member].id));
+    assert.match(channel.say("gus", "grove who is your dad", { gapMs: 60_000 }).text ?? "", /dads/);
+    assert.match(channel.say("gus", "grove do you have a mom", { gapMs: 60_000 }).text ?? "", /no moms/);
+    assert.match(channel.say("gus", "grove who is your mommy", { gapMs: 60_000 }).text ?? "", /no moms/);
+    assert.match(channel.say("gus", "grove whats drizzo", { gapMs: 60_000 }).text ?? "", /my dad/);
+    assert.match(channel.say("gus", "grove what is fld10", { gapMs: 60_000 }).text ?? "", /dad/);
+    assertGroveVoice(parents.text);
+  });
+
+  it("finishes a famous sentence properly, and makes up the rest", () => {
+    const channel = new Channel();
+    const fox = channel.say("gus", 'grove finish the sentence. "the quick brown fox..."');
+    assert.equal(fox.act, "finish_sentence");
+    assert.match(fox.text ?? "", /jumps over the lazy dog/);
+    assert.match(channel.say("gus", "grove finish the sentence. to be or not to be", { gapMs: 60_000 }).text ?? "", /that is the question/);
+    const made = channel.say("gus", "grove finish the sentence. zorple the flarn", { gapMs: 60_000 });
+    assert.equal(made.act, "finish_sentence");
+    assert.match(made.text ?? "", /zorple the flarn/);
+    assertGroveVoice(made.text);
+  });
+
+  it("knows what a ditto is, but not every 'ditto'", () => {
+    const channel = new Channel();
+    const ditto = channel.say("hal", "grove what is a ditto");
+    assert.equal(ditto.act, "fantasy.pokemon");
+    assert.match(ditto.text ?? "", /copies/);
+    assert.match(channel.say("hal", "grove are there slimes in pokemon", { gapMs: 60_000 }).text ?? "", /ditto/);
+    assert.notEqual(channel.say("hal", "grove ditto", { gapMs: 60_000 }).act, "fantasy.pokemon");
+    assertGroveVoice(ditto.text);
+  });
+
   it("knows the time, the day, and its birthday", () => {
     const channel = new Channel();
     assert.match(channel.say("jay", "grove what time is it").text ?? "", /2 pm|2-something pm/);

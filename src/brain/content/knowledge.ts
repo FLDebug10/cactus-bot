@@ -88,6 +88,7 @@ export const JOKES: readonly string[] = [
 
 // Who made Grove, in Grove's words. Drizzo and FLD10 started it; Overgrown built on top.
 // `they`/`you` finish "drizzo ___" and "you ___"; the short forms are for quick mentions.
+// Drizzo and FLD10 are a couple, so the two of them are Grove's dads.
 export interface CrewRole {
   name: string;
   they: string;
@@ -118,6 +119,27 @@ export const CREW_ROLES: Readonly<Record<CrewMember, CrewRole>> = {
     theyShort: "gave me my brain",
     youShort: "gave me my brain",
   },
+};
+
+// Grove's dads, for "who are your parents?". Drizzo and FLD10 are a couple and
+// made Grove between them, so Grove has two dads and calls them both that.
+// "<drizzo>" and "<fld10>" become mention pills when Grove says these out loud.
+export const DADS: readonly string[] = [
+  "my dads are <drizzo> and <fld10>! <drizzo> drew me and wrote my very first code, and <fld10> hosts me, which means he feeds me electricity. they're together, so they made me as a team",
+  "i have two dads! <drizzo> is the one who drew me and gave me my first code, and <fld10> is the one who hosts me and feeds me. they're a couple, so i'm theirs twice over",
+  "both of them are my dads and i love them very much: <drizzo> drew me, and <fld10> feeds me every single day. overgrown gave me my brain, so that one is family too",
+];
+
+// The parts of a dad that aren't the other dad, for "who is drizzo?".
+export const DAD_ABOUT: Readonly<Record<"drizzo" | "fld10", readonly string[]>> = {
+  drizzo: [
+    "drizzo is my dad! he's the artist who drew me and wrote my very first code, so i wouldn't be here without him. i love him very much",
+    "that's my dad! he drew me, wrote my first code, and named the plants on my head. i'm very fond of him",
+  ],
+  fld10: [
+    "fld10 is my other dad! he hosts me, which means he feeds me electricity, and he brought all the old carl-bot commands over to me. i love him",
+    "that's my dad! he keeps me running and fed, and he taught me all the old carl-bot commands. i love him very much",
+  ],
 };
 
 export function crewMemberById(userId: string): CrewMember | null {
