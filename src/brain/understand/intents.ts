@@ -402,7 +402,7 @@ const FRAMES: readonly Frame[] = [
 
   ["ask_origin_story", re(/\bhow (were|where|was|did) (you|grove) (made|born|created|built|come to be|come to life|get made|get here|start|appear|begin)\b|\bwhere did (you|grove) come from\b|\b(your|grove) (origin story|backstory|back story|lore|life story)\b|\bhow did (you|grove) come to be\b|\bwhere were you born\b|\bwhat is your (origin|backstory|story)\b|\bhow are you (made|alive)\b/), 0.9],
 
-  ["ask_creator", re(/\b(do you have|you have|have you got|got) (a |any )?(?<kind>family|siblings|sibling|brothers?|sisters?|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|fathers?|kids|children|babies|baby slimes)\b|\bwho (is|are) your (?<kind>family|siblings|brothers|sisters|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|father|fathers)\b|\b(tell me about|what about) your family\b/), 0.9],
+  ["ask_creator", re(/\b(do you have|you have|have you got|got) (a |any )?(?<kind>family|siblings|sibling|brothers?|sisters?|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|fathers?|kids|children|babies|baby slimes)\b|\bwho (is|are) your (?<kind2>family|siblings|brothers|sisters|parents?|mom|moms|momma|mommas|mommy|mommies|mum|mums|mumma|mummies|mother|mothers|dad|dads|daddies|daddy|father|fathers)\b|\b(tell me about|what about) your family\b/), 0.9],
 
   ["ask_creator", re(/\bwho (made|created|built|coded|programmed|owns|wrote|designed|drew|invented) (you|grove|this bot|the bot|this)\b|\bwho is your (creator|owner|maker|dev|developer|dad|mom|mother|father|parent|parents|daddy|mommy)\b/), 0.95],
 
