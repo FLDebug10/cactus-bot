@@ -67,6 +67,7 @@ function send(author: string, text: string, replyToGrove: boolean): void {
     lastGroveMessage = { id: sentId };
     console.log(`grove: ${decision.text}`);
   }
+  if (decision.files.length > 0) console.log(`   (attaches ${decision.files.join(", ")})`);
   if (decision.reactions.length > 0) console.log(`   (reacts ${decision.reactions.join(" ")})`);
   grove.didSay(decision, sentId, now);
   console.log(`   [${decision.meta.act}${decision.meta.topic ? `, ${decision.meta.topic}` : ""}]`);

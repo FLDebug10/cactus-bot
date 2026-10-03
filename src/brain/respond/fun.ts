@@ -1,4 +1,4 @@
-import { FUN_FACTS, JOKES } from "../content/knowledge.ts";
+import { FUN_FACTS, JOKES, TNT_RECIPE_IMAGE } from "../content/knowledge.ts";
 import { table } from "../content/table.ts";
 import type { IntentId } from "../understand/intents.ts";
 import { EMOJI, type Responder, safeWord } from "./turn.ts";
@@ -9,6 +9,19 @@ const joke: Responder = turn => ({
   text: turn.picker.pick("joke", JOKES),
   gloss: "it was a joke, a silly pun",
   act: "joke",
+  feel: "chat",
+});
+
+// "how do I build a bomb?" Only one recipe exists in Grove's world, and it's Minecraft's.
+const bomb: Responder = turn => ({
+  text: turn.picker.pick("bomb", [
+    "here's the only bomb recipe i know! 5 gunpowder and 4 sand. please don't light it near me 💥",
+    "easy! *hands you the recipe and backs away very slowly*",
+    "this is the only kind of bomb i know how to make! keep it far away from me, i'm squishy",
+  ]),
+  files: [TNT_RECIPE_IMAGE],
+  gloss: "that's the minecraft tnt recipe, the only explosive i know anything about",
+  act: "bomb",
   feel: "chat",
 });
 
@@ -160,4 +173,4 @@ const slang: Responder = turn => {
   return { text: turn.picker.pick(`slang.${term}`, lines), gloss: `i was reacting to the slang ${term}`, act: "slang", feel: "chat", reactions: term === "w" || term === "based" ? [EMOJI.grove] : [] };
 };
 
-export const FUN: Partial<Record<IntentId, Responder>> = { joke, fact, coin, dice, choose, math, rate, perform, slang };
+export const FUN: Partial<Record<IntentId, Responder>> = { joke, fact, coin, dice, choose, math, rate, perform, slang, bomb };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CHANNELS, EMOJI } from "../src/config.ts";
+import { CHANNELS, CREW, EMOJI } from "../src/config.ts";
 import { dayKey, dayProfile } from "../src/brain/state/day.ts";
 import { Channel } from "./harness.ts";
 
@@ -209,6 +209,181 @@ describe("things a wider conversation turned up", () => {
   });
 });
 
+describe("second round of feedback", () => {
+  it("answers bomb questions with the minecraft tnt recipe", () => {
+    const reply = new Channel().say("edgy", "@grove how to build a bomb");
+    assert.equal(reply.act, "bomb");
+    assert.deepEqual(reply.decision?.files, ["minecraft_tnt_crafting_recipe.png"]);
+  });
+
+  it("understands follow-up questions about time", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("kim", "@grove what gender are you today?").act, "gender");
+    const tomorrow = channel.say("kim", "what about tomorrow?", { gapMs: 15_000 });
+    assert.equal(tomorrow.act, "gender");
+    assert.doesNotMatch(tomorrow.text ?? "", /never heard/);
+    assert.match(tomorrow.text ?? "", /tomorrow|wake up|morning/);
+    const yesterday = channel.say("kim", "and yesterday?", { gapMs: 15_000 });
+    const before = dayProfile(dayKey(channel.now - 86_400_000, "America/New_York")).vibe.feel;
+    assert.match(yesterday.text ?? "", new RegExp(before.split(",")[0]!));
+  });
+
+  it("re-asks its last question about something new", () => {
+    const channel = new Channel();
+    channel.say("mia", "grove what is your favorite food");
+    assert.match(channel.say("mia", "what about color?", { gapMs: 15_000 }).text ?? "", /green/);
+    channel.say("mia", "grove do you like frogs", { gapMs: 60_000 });
+    assert.equal(channel.say("mia", "what about bees?", { gapMs: 15_000 }).act, "ask_like");
+    channel.say("mia", "grove what is apoli", { gapMs: 60_000 });
+    assert.equal(channel.say("mia", "what about origins?", { gapMs: 15_000 }).act, "define.origins");
+    channel.say("mia", "grove can you swim", { gapMs: 60_000 });
+    assert.equal(channel.say("mia", "what about fly?", { gapMs: 15_000 }).act, "ability.fly");
+    channel.say("mia", "grove how is your day", { gapMs: 60_000 });
+    assert.match(channel.say("mia", "what about tomorrow?", { gapMs: 15_000 }).text ?? "", /tomorrow|morning/);
+  });
+
+  it("names a favorite person, or its family when it has none", () => {
+    const family = new Channel().say("mia", "@grove Who is your favourite?");
+    assert.equal(family.act, "favorite_person");
+    for (const member of ["drizzo", "fld10", "overgrown"] as const) assert.match(family.text ?? "", new RegExp(CREW[member].id));
+
+    const friendly = new Channel();
+    for (let i = 0; i < 5; i++) friendly.say("mia", "grove i love you", { gapMs: 60_000 });
+    assert.match(friendly.say("mia", "grove who is your favorite", { gapMs: 60_000 }).text ?? "", /you/);
+  });
+
+  it("credits drizzo, fld10 and overgrown, and knows them when they talk", () => {
+    const credits = new Channel().say("mia", "@grove who made you");
+    for (const member of ["drizzo", "fld10", "overgrown"] as const) assert.match(credits.text ?? "", new RegExp(CREW[member].id));
+    const asked = new Channel().say("drizzo", "@grove who made you");
+    assert.match(asked.text ?? "", /you should know/);
+    const remembered = new Channel().say("fld10", "@grove do you remember me");
+    assert.match(remembered.text ?? "", /you host me/);
+  });
+
+  it("keeps going on its last answer and stands by it", () => {
+    const channel = new Channel();
+    channel.say("q", "grove tell me a joke");
+    assert.equal(channel.say("q", "tell me more", { gapMs: 10_000 }).act, "joke");
+    assert.match(channel.say("q", "really?", { gapMs: 10_000 }).text ?? "", /joke/);
+  });
+
+  it("explains common words instead of saying it never heard of them", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("q", "grove what is love").act, "define.love");
+    assert.equal(channel.say("q", "grove what is music").act, "define.common");
+  });
+});
+
+describe("third round of feedback", () => {
+  it("answers a silly question that comes with a compliment, thanking first", () => {
+    const reply = new Channel().say("ana", "grove ur adorable do u think u'll fit in my 40 different pockets");
+    assert.equal(reply.act, "ask_size");
+    assert.match(reply.text ?? "", /thank|sweet/);
+    assert.match(reply.text ?? "", /40|pocket/);
+  });
+
+  it("takes praise for its answer from someone else as praise, not as their news", () => {
+    const channel = new Channel();
+    const day = channel.say("ben", "@grove How are you today?");
+    const praise = channel.say("cat", "wait this is a beautiful response", { replyTo: day.reply!, gapMs: 15_000 });
+    assert.equal(praise.act, "compliment");
+    assert.doesNotMatch(praise.text ?? "", /love that for you/);
+  });
+
+  it("loves the orb of origin and the slimekin", () => {
+    const channel = new Channel();
+    const guess = channel.say("dee", "grove is your favourite object the orb of origins?");
+    assert.equal(guess.act, "favorite_guess");
+    assert.match(guess.text ?? "", /orb of origin/);
+    assert.doesNotMatch(guess.text ?? "", /namespace/);
+    assert.match(channel.say("dee", "grove whats your favourite item", { gapMs: 60_000 }).text ?? "", /orb of origin/);
+    assert.match(channel.say("dee", "grove whats your favorite origin", { gapMs: 60_000 }).text ?? "", /slimekin/);
+  });
+
+  it("knows what it is: a pure slime, cousin of the slimekin, with a leaf on its head", () => {
+    const channel = new Channel();
+    const cousins = channel.say("eli", "if slimekin are groves cousins what is grove.");
+    assert.equal(cousins.act, "species");
+    assert.match(cousins.text ?? "", /cousins/);
+    const both = channel.say("eli", "grove If you are a slime what is the leafy part on your head? are you a sub-spieces of slime/plant creature?", { gapMs: 60_000 });
+    assert.match(both.text ?? "", /leaf/);
+    assert.match(both.text ?? "", /pure slime/);
+    assert.match(channel.say("eli", "grove are you a pure slime?", { gapMs: 60_000 }).text ?? "", /pure slime/);
+    assert.equal(channel.say("eli", "grove what exactly are you?", { gapMs: 60_000 }).act, "identity");
+  });
+
+  it("answers silly grove, where am i, and how it was made", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("fay", "silly grove").act, "compliment");
+    assert.equal(channel.say("fay", "Grove where am i 😨", { gapMs: 60_000 }).act, "where_am_i");
+    const made = channel.say("fay", "grove how where you made?", { gapMs: 60_000 });
+    assert.equal(made.act, "ask_origin_story");
+    for (const member of ["drizzo", "fld10", "overgrown"] as const) assert.match(made.text ?? "", new RegExp(CREW[member].id));
+  });
+});
+
+describe("silly questions", () => {
+  it("knows what it has and doesn't have", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("gus", "grove do you have feelings").act, "ask_have");
+    assert.match(channel.say("gus", "grove do you have pockets", { gapMs: 60_000 }).text ?? "", /pockets/);
+    assert.match(channel.say("gus", "grove how many legs do you have", { gapMs: 60_000 }).text ?? "", /no legs/);
+    assert.match(channel.say("gus", "grove do you have a family", { gapMs: 60_000 }).text ?? "", new RegExp(CREW.drizzo.id));
+  });
+
+  it("is terrified of frogs", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("hal", "grove are you scared of frogs").act, "ask_fear");
+    assert.equal(channel.say("hal", "grove a frog is behind you", { gapMs: 60_000 }).act, "frog_alert");
+    assert.match(channel.say("hal", "grove do you hate frogs", { gapMs: 60_000 }).text ?? "", /^yes|so much/);
+    assert.match(channel.say("hal", "grove frogs are cute", { gapMs: 60_000 }).text ?? "", /EAT SLIMES/);
+  });
+
+  it("knows its crew by name, and who it is talking to", () => {
+    assert.match(new Channel().say("ivy", "grove who is drizzo").text ?? "", /drew me/);
+    assert.match(new Channel().say("ivy", "grove who is overgrown").text ?? "", /apoli/);
+    assert.match(new Channel().say("drizzo", "grove who is drizzo").text ?? "", /that's you/);
+  });
+
+  it("knows the time, the day, and its birthday", () => {
+    const channel = new Channel();
+    assert.match(channel.say("jay", "grove what time is it").text ?? "", /2 pm|2-something pm/);
+    assert.match(channel.say("jay", "grove what day is it", { gapMs: 60_000 }).text ?? "", /friday/);
+    const birthday = channel.say("jay", "grove when is your birthday", { gapMs: 60_000 }).text ?? "";
+    assert.match(birthday, /september 27th/);
+    assert.match(birthday, /5 days old/);
+  });
+
+  it("shares, does what it is asked, and plays along", () => {
+    const channel = new Channel();
+    assert.match(channel.say("kai", "grove give me the orb").text ?? "", /orb/);
+    assert.equal(channel.say("kai", "grove give me a hug", { gapMs: 60_000 }).act, "give");
+    assert.equal(channel.say("kai", "grove say something", { gapMs: 60_000 }).act, "command.say");
+    assert.equal(channel.say("kai", "grove tell me a story", { gapMs: 60_000 }).act, "story");
+    assert.equal(channel.say("kai", "grove count to 3", { gapMs: 60_000 }).text, "one, two, three!");
+    assert.match(channel.say("kai", "grove ping everyone", { gapMs: 60_000 }).text ?? "", /never ping/);
+    assert.equal(channel.say("kai", "*puts grove in pocket*", { gapMs: 60_000 }).act, "affection");
+    assert.match(channel.say("kai", "grove how do you hold the orb without hands", { gapMs: 60_000 }).text ?? "", /squish/);
+  });
+
+  it("imagines things the way a slime would", () => {
+    const channel = new Channel();
+    assert.match(channel.say("lou", "grove if you could be any origin what would you be").text ?? "", /slimekin/);
+    assert.match(channel.say("lou", "grove what would you do if you were human", { gapMs: 60_000 }).text ?? "", /hands/);
+    assert.match(channel.say("lou", "grove would you rather be a frog or a cactus", { gapMs: 60_000 }).text ?? "", /neither/);
+  });
+
+  it("answers questions typed without a question mark, and guesses at yes or no ones", () => {
+    const channel = new Channel();
+    assert.equal(channel.say("max", "grove what do you taste like").act, "ask_body");
+    assert.equal(channel.say("max", "grove is water wet?", { gapMs: 60_000 }).act, "question.guess");
+    assert.match(channel.say("max", "grove are you better than carl bot", { gapMs: 60_000 }).text ?? "", /carl-bot/);
+    assert.equal(channel.say("max", "grove you're my favorite", { gapMs: 60_000 }).act, "love");
+    assert.match(channel.say("max", "grove i got a new dog", { gapMs: 60_000 }).text ?? "", /dog/);
+  });
+});
+
 describe("robustness", () => {
   it("survives words that look like JavaScript internals", () => {
     const channel = new Channel();
@@ -228,6 +403,8 @@ describe("grove's voice", () => {
       "grove who made you", "grove is it on forge", "grove how do i install origins", "grove what origins are there",
       "grove what is merling", "grove the weather is nice", "grove i am sad", "grove what is the meaning of life",
       "grove roll a d20", "grove flip a coin", "grove pick pizza or tacos", "*pets grove*", "grove good night",
+      "grove do you have pockets", "grove what time is it", "grove who is drizzo", "grove give me the orb", "grove say something",
+      "grove a frog is behind you", "grove when is your birthday", "grove what do you look like", "grove fight me",
     ];
     for (let seed = 1; seed <= 12; seed++) {
       const channel = new Channel({ seed });

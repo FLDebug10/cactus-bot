@@ -18,6 +18,8 @@ export interface Friend {
 export interface Memory {
   friend(userId: string): Friend | null;
   save(friend: Friend): void;
+  // The people Grove likes most, warmest first.
+  favorites(limit: number): Friend[];
   noteMiss(channelId: string, userId: string, text: string, at: number): void;
   recentMisses(limit: number): Array<{ at: number; userId: string; text: string }>;
   loadState(key: string): string | null;
@@ -36,6 +38,10 @@ export class InMemoryMemory implements Memory {
 
   save(friend: Friend): void {
     this.friends.set(friend.userId, { ...friend, likes: [...friend.likes] });
+  }
+
+  favorites(limit: number): Friend[] {
+    return [...this.friends.values()].sort((a, b) => b.affinity - a.affinity).slice(0, limit).map(friend => ({ ...friend, likes: [...friend.likes] }));
   }
 
   noteMiss(_channelId: string, userId: string, text: string, at: number): void {

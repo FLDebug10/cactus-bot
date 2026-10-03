@@ -22,6 +22,15 @@ export interface DayProfile {
   highlight: string;
   vibe: Vibe;
   thought: string;
+  // What the weather was like in Grove's moss patch, finishing "it's ___ here".
+  weather: string;
+}
+
+export interface Calendar {
+  weekday: string;
+  month: string;
+  date: number;
+  year: number;
 }
 
 const MORNING: readonly Activity[] = [
@@ -80,6 +89,14 @@ const THOUGHTS = [
   "what if i'm actually a very small ocean",
 ];
 
+const WEATHER = [
+  "sunny and warm, perfect for sitting on a lily pad",
+  "a little cloudy, but cozy",
+  "warm and a bit damp, perfect slime weather",
+  "breezy! my leaf keeps flapping",
+  "misty in the morning and sunny after",
+];
+
 // Grove is a slime and has no sex at all, so its gender is just a mood.
 // It picks one each morning and wears it all day.
 const VIBES: readonly Vibe[] = [
@@ -102,18 +119,25 @@ export function hourIn(at: number, timeZone: string): number {
   return Number.parseInt(hour, 10) % 24;
 }
 
+export function calendarIn(at: number, timeZone: string): Calendar {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long", month: "long", day: "numeric", year: "numeric" }).formatToParts(new Date(at));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(entry => entry.type === type)?.value ?? "";
+  return { weekday: part("weekday").toLowerCase(), month: part("month").toLowerCase(), date: Number.parseInt(part("day"), 10), year: Number.parseInt(part("year"), 10) };
+}
+
 export function dayProfile(key: string): DayProfile {
   const random = seeded(hash(key));
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
-  return {
-    key,
-    morning: pick(MORNING),
-    afternoon: pick(AFTERNOON),
-    evening: pick(EVENING),
-    highlight: pick(HIGHLIGHTS),
-    vibe: pick(VIBES),
-    thought: pick(THOUGHTS),
-  };
+  const morning = pick(MORNING);
+  const afternoon = pick(AFTERNOON);
+  const evening = pick(EVENING);
+  const highlight = pick(HIGHLIGHTS);
+  const vibe = pick(VIBES);
+  const thought = pick(THOUGHTS);
+  // A day Grove spent in the rain stays a rainy day, whatever else it says.
+  const rained = [morning.did, afternoon.did, evening.did, highlight].some(line => /\brain/.test(line));
+  const weather = rained ? "rainy! i got to sit in it, which is my favorite thing" : pick(WEATHER);
+  return { key, morning, afternoon, evening, highlight, vibe, thought, weather };
 }
 
 function hash(text: string): number {

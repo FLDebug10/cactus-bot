@@ -5,53 +5,54 @@
 export const REAL_WORDS: ReadonlySet<string> = new Set(`
 accoying acute adherable admirable adoptable adorably adsorbable agly aioli alloying amassing amating
 amazingly anight annexing annoyingly apathetic apian arachnidan arachnids arachnoid arachnoids artificially
-atonable aversion aversions avians avion avowable awesomely awsome bade badged badger badgers bagged bale
-bams bandages barge barges baring baseball baseborn basketballs bathetic bean beaning beautifuler beautifully
-beautify begged bender bigged bight birl birthdate birthdays birthdom blogring boarding bodge bodges boding
-bogged boing boking boning booing borating boringly borings borking borming bower bowering bowers bowing
-boxing boying brash brashed brashes brashing brog brogs broked brokenly broker brokes budge budged budges
-bugger buggered bugled bulged bunged bunny bute cadge cadges calashes camashes cams cannel cantest cantiest
-carwashes caseated cash cashed cashes cashing cate cava caveated caveator cello centries centry cerastes
-cerated cete chancel chancels chank chanks channeled channeler channels channer channers charnel charnels
-cheated chelated chelator chunnel chunnels chute cirl cite clash clashed clashers clashes clashing clashings
-clasping classing claver cleated cleaver cleavers cleve cleverer cleverly cleves clime clover coaching
-coalshed coasting coattest coconscious cocreated cocreator commanded commander commanders commando commandoes
-commandos commend commends comments commoned communed communes compand compands compends competitions
-competitive competitor composition compotation computation confest congest congests conkiest conquest
-consciouses consciously consonous contempt content contents contes contessa contested contester contests
-context contexts contrast contrist corelated coring corking corniest corning cote cotlands countess couscous
-couthest cower cowers cowhands craaling crabbing cracking cradle cradling cramming cramping cranched cranches
-cranching cranking crapping crases crasher crashers crashingly crashpad crass crassest cratches crated
-crawling creaked creamed creased creasing creasoted creates creation creators credited creditor creeky creep
-creepily creeps creeshed creeshes creeshing cremated cremates cremator cremators crematory crenated crepey
-crepy crested cresting crinated crisping crog crogs cronkest crossing crush crushed crushers crushes crushing
-crusting cuke cuneated cure curetted curvated cuter cutes cutey cutie cuts cyte dale dams databank databanks
-daypacks deadlier deadlift deadlined deadlines deadliness dean deaning dearling degusting deport deporting
-digesting dight dirl discission discissions discursion discursions discussing discussional discussions
-discussive disgesting disguising disgustingly dislustring dismasting dismission disnesting dispassion
-disposting disputing disrupting dissuasion distasting distrusting disusing documentarian documentational
-documentations doest dower dowers downgrading downland downloaded downloads dragline duma dumbo dumbs dump
-dunny eale eaning eateries eevning eevnings emending endbrain endemial energies enterics entires entities
-entrails entrains entrees entremes entrisms entrists entropies entwines errorist evenings evensong eventing
-eventings eversion eversions everting evincing explained explainer explains fabrics factions factures fadge
-fadges fanny fava favoring favorites favouring favourites fayer feathers featuous featured featurely felinely
-felines femal females femals fender fenny ferine fictions filature filatures finny fixature fixatures
-fixtures flatuses flayer flayers flection flections flitch flitched flog flogs fluorite fogs forage force
-fore forged forger forges forgo forking forme forte forze fraction fractions fracture fractures frag frags
-fretty friction frictions frig frigs fritures froe froes frons fros frow frows frug frugs fugged fugly
-functional functionals functioned functors fundy funky furcation furcations fuseless gadge gadges gale
-galleria galley gams gander garage garbages garbagey garbagy gayer gean gelder gendered genders gentries
-gentry gill gird girls girly girn giro girr girt glime glitches glitchier glitchy glunched gorge gorgeously
-goring gradable grade graile grakle graple grayle grillery grog grogram grogs grrl grutched guardage guilt
-gullery guly gunny hale hams handbooks handloom handwork hank hanks hardboot hayer hayers headline helio
-hellos hells heme herling hight hillo hollo horning horribles horribly horridly hugged hulk hullo huma humane
-humans humas idiom idiots infalling initialled initialling inshelled inshelling instable instal installant
-installer installers installs instals instanced instancing instarred instarring instated instating instill
-instilled instiller instilling instills inwalled inwalling issued issuer issuers jabs jafa jaga jags jaks
-jamb jambs james japs jars jass javas jaws jays jean jello jeon jodel jodels jugged junction junctions jute
-kale kava kight knight lacer lacers lader laders laer laers lager lagers laker lakers lamer lams laser lasers
-lava laver lavers lawer lawful lawyer lawyers laxer layed layovers lean leaning lease lender lever lime
-lively lonely loring lorry loveably lovelily loverly lovey lower lowers lugged lute mabe mace macle madge
+asprout atonable aversion aversions avians avion avowable awesomely awsome bade badged badger badgers bagged
+bale bams bandages barge barges baring baseball baseborn basketballs bathetic bean beaning beautifuler
+beautifully beautify begged bender bigged bight birl birthdate birthdays birthdom blogring boarding bodge
+bodges boding bogged boing boking boning booing borating boringly borings borking borming bower bowering
+bowers bowing boxing boying brash brashed brashes brashing brog brogs broked brokenly broker brokes budge
+budged budges bugger buggered bugled bulged bunged bunny bute cadge cadges calashes camashes cams cannel
+cantest cantiest carwashes caseated cash cashed cashes cashing cate cava caveated caveator cello centries
+centry cerastes cerated cete chancel chancels chank chanks channeled channeler channels channer channers
+charnel charnels cheated chelated chelator chunnel chunnels chute cirl cite clash clashed clashers clashes
+clashing clashings clasping classing claver cleated cleaver cleavers cleve cleverer cleverly cleves clime
+clover coaching coalshed coasting coattest cocket cockets coconscious cocreated cocreator commanded commander
+commanders commando commandoes commandos commend commends comments commoned communed communes compand
+compands compends competitions competitive competitor composition compotation computation confest congest
+congests conkiest conquest consciouses consciously consonous contempt content contents contes contessa
+contested contester contests context contexts contrast contrist corelated coring corking corniest corning
+cote cotlands countess couscous couthest cower cowers cowhands craaling crabbing cracking cradle cradling
+cramming cramping cranched cranches cranching cranking crapping crases crasher crashers crashingly crashpad
+crass crassest cratches crated crawling creaked creamed creased creasing creasoted creates creation creators
+credited creditor creeky creep creepily creeps creeshed creeshes creeshing cremated cremates cremator
+cremators crematory crenated crepey crepy crested cresting crinated crisping crog crogs cronkest crossing
+crush crushed crushers crushes crushing crusting cuke cuneated cure curetted curvated cuter cutes cutey cuts
+cyte dale dams databank databanks daypacks deadlier deadlift deadlined deadlines deadliness dean deaning
+dearling degusting deport deporting digesting dight dirl discission discissions discursion discursions
+discussing discussional discussions discussive disgesting disguising disgustingly dislustring dismasting
+dismission disnesting dispassion disposting disputing disrupting dissuasion distasting distrusting disusing
+docket dockets documentarian documentational documentations doest dower dowers downgrading downland
+downloaded downloads dragline duma dumbo dumbs dump dunny eale eaning eateries eevning eevnings emending
+endbrain endemial energies enterics entires entities entrails entrains entrees entremes entrisms entrists
+entropies entwines errorist evenings evensong eventing eventings eversion eversions everting evincing
+explained explainer explains fabrics factions factures fadge fadges fanny fava favoring favorites favouring
+favourites fayer feathers featuous featured featurely felinely felines femal females femals fender fenny
+ferine fictions filature filatures finny fixature fixatures fixtures flatuses flayer flayers flection
+flections flitch flitched flog flogs fluorite fogs forage force fore forged forger forges forgo forking forme
+forte forze fraction fractions fracture fractures frag frags fretty friction frictions frig frigs fritures
+froe froes frons fros frow frows frug frugs fugged fugly functional functionals functioned functors fundy
+funky furcation furcations fuseless gadge gadges gale galleria galley gams gander garage garbages garbagey
+garbagy gayer gean gelder gendered genders gentries gentry gill gird girls girly girn giro girr girt glime
+glitches glitchier glitchy glunched gorge gorgeously goring gradable grade graile grakle graple grayle
+grillery grog grogram grogs grrl grutched guardage guilt gullery guly gunny hale hams handbooks handloom
+handwork hank hanks hardboot hayer hayers headline helio hellos hells heme herling hight hillo hollo horning
+horribles horribly horridly hugged hulk hullo huma humane humans humas idiom idiots infalling initialled
+initialling inshelled inshelling instable instal installant installer installers installs instals instanced
+instancing instarred instarring instated instating instill instilled instiller instilling instills inwalled
+inwalling issued issuer issuers jabs jafa jaga jags jaks jamb jambs james japs jars jass javas jaws jays jean
+jello jeon jodel jodels jugged junction junctions jute kale kava kight knight lacer lacers lader laders laer
+laers lager lagers laker lakers lamer lams laser lasers lava laver lavers lawer lawful lawyer lawyers laxer
+layed layovers leady leaf leafs leaky lean leaning leany leary lease leavy lender lever lime lively locket
+lockets lonely loring lorry loveably lovelily loverly lovey lower lowers lugged lute mabe mace macle madge
 madges mage maile mala males mali mall malm mals malt mams mane maple marbling mare marle marling marlings
 mart mase mate maze mazing mead meal mealing meane meaningly meanings means meany mearing measing measling
 meat medaling meddling mediad mediae medial median medias medic medii medina medling mein meining melanins
@@ -59,41 +60,44 @@ melling menacing menaging mender mening merging mergings mering meriting merlin 
 mersions metaling mewling mile mineshaft mirin mixen mixing moan moaning moanings modal modals mode modelers
 modelist modellos modem modems moder moders modes mohel mohels mole mooning morel morels morling morlings
 mornings morphing mortling motel motels mounding mounting mourning mournings mower mowers mugged mule murling
-mute nams nicht nigh nighs nights nirl numb nunny origan origanes origans original originals ovening
-overblown overbrow overbrows overcrow overcrowd overcrowds overcrows overdrawn overflown overgrain overgrains
-overgreen overgreens overgrew overground overgrow overgrowing overgrows overgrowth overgrowths oversown
-overthrown ower pale pams paoli paragram parhelic pathetical pathetics pawer pawers payer payers pean peaning
-pease periblem periblems petrogram petty phantasm phantoms phantomy phantosme picogram pight piki pirl pleas
-pleased pleaser pleasers pleases pleaseth pleasure plower plowers plowters poker pokers poler polers porer
+mute nams nicht nigh nighs nights nirl nocket nockets numb nunny origan origanes origans original originals
+ovening overblown overbrow overbrows overcrow overcrowd overcrowds overcrows overdrawn overflown overgrain
+overgrains overgreen overgreens overgrew overground overgrow overgrowing overgrows overgrowth overgrowths
+oversown overthrown ower packet packets pale pams paoli paragram parhelic pathetical pathetics pawer pawers
+payer payers pean peaning pease periblem periblems petrogram petty phantasm phantoms phantomy phantosme
+picket pickets picogram pight piki pirl plackets pleas pleased pleaser pleasers pleases pleaseth pleasure
+plower plowers plowters pocked pocketed pocketer pocketers pockiest pockpits poker pokers poler polers porer
 porers porge poring porking poser posers powder powders powre powres powter powters prease prebless precipe
-prettify prettily problemist profound profounds prog prograde programed programer programme programs progs
-prollers proneurs pronotum pronounce pronounces propound propounds prothetic proulers prower prowlers pugged
-punny questing questioned questionee questioner questions quill quilts quint quirt quist quit radge radges
-rale rams rash rashed rashes rashing rean rebooting reboring recite recoating recording recorking redia
-reexport reexporting refooting reforging reforming regorging reimport reimporting reird reline render
+prettify prettily prickets problemist profound profounds prog prograde programed programer programme programs
+progs prollers proneurs pronotum pronounce pronounces propound propounds prothetic proulers prower prowlers
+pugged punny questing questioned questionee questioner questions quill quilts quint quirt quist quit radge
+radges rale rams rash rashed rashes rashing rean rebooting reboring recite recoating recording recorking
+redia reexport reexporting refooting reforging reforming regorging reimport reimporting reird reline render
 reparking repasting repeating repenting reperking replating repleting replotting repointing repolling
 reponing reported reporter reportingly reportings reports reposing repositing repost reposting repot
 repotting repottings repouring reprobing reproving repuring reputing rerouting resorbing resort resorting
-respotting retort retorting reverting revolting revoting rewording reworking rheme riposting robots root
-rouble rower rowers rugged runny saggiest sale sams sayer sayers scaleboard scart scoreboards scorecard sculk
-scute sean seaning sender sentience sentiency sentiently sentients sentiment sentiments sentinel sentries
-sentry serry servient shank shanks shart shortboard shuck shul shule shuln shuls sight skart skulk slart
-slayer slayers slice slide slim slimed slims slimy slipe slive slugfest smalt smarm smarts smarty smokeboard
-smuggest snuggest soggiest soring sorning sorra sower sowers spart spirited spite sprinted sprinter sprit
-spritely sprites sprits spritz spritzed spritzer spritzes stime storyboard stuggiest stuped stupider stupidly
-stupids sublimit submersion submersions submissive submits sugged suggested suggester suggesting
-suggestionise suggestionism suggestionist suggestive suggests sulk summit sunny surgiest swart sweethearted
-sweethearts sweetmeat tale tams tank tanks tannoying tash tava tearable teme tender tensible terribles
-terribly terricole terror terrors tersion tersions textiles textuaries textuary textural textured texturise
-texturises texturize texturizes thack thacks thana thanas thane thanes thang thangkas thangs thankers thans
-thebe thee thema themed themes therme thete thinks thrash thunk thunks thurible thyme tight tiki tirl tissue
-tissues toady todays toddy tody tokay tortures tower towers trank tranks trashed trashes trashing trashy
-trass treated trog trogs troubled troubler troublers troubles troule troutlet tugged tunny twank twanks ugged
-unction unctions undate underhand undersaid underspend understanded understander understands understate
-understated understood undertane updarted updated updater updaters updates uprate uselessly usheress vale
-vender venisons versin versines versings versins versional versioned versioner versioners versionist vide
-vireo vireos virl vower vowers waesome wale warking wartless wean weaning weid weir weirdo weirds weirdy
-weired weirs wight wikis wili wonderfully wonderous wontless wording wordings wordless workings workless
-worming worrying worsing worsting worthies worthiest worthiness worthing worthlessly wrathless wroken yale
-yams yean yeaning yodel yodels yorking
+respotting retort retorting reverting revolting revoting rewording reworking rheme riposting robots rocket
+rockets root rouble rower rowers rugged runny saggiest sale sams sayer sayers scaleboard scart scoreboards
+scorecard sculk scute sean seaning sender sentience sentiency sentiently sentients sentiment sentiments
+sentinel sentries sentry serry servient shank shanks shart shortboard shuck shul shule shuln shuls sight
+skart skulk slart slayer slayers slice slide slim slimed slims slimy slipe slive slugfest smalt smarm smarts
+smarty smokeboard smuggest snuggest socket sockets soggiest soring sorning sorra sower sowers spaciest spart
+speccies specials speciates specifies specimen specimens specious speckier speckiest speckles specters
+spectres speeches spetches spewiest spiciest spirited spite spout sprinted sprinter sprit spritely sprites
+sprits spritz spritzed spritzer spritzes sprouted sprouts stime storyboard strout stuggiest stuped stupider
+stupidly stupids sublimit submersion submersions submissive submits subseries subspaces sugged suggested
+suggester suggesting suggestionise suggestionism suggestionist suggestive suggests sulk summit sunny surgiest
+swart sweethearted sweethearts sweetmeat tale tams tank tanks tannoying tash tava tearable teme tender
+tensible terribles terribly terricole terror terrors tersion tersions textiles textuaries textuary textural
+textured texturise texturises texturize texturizes thack thacks thana thanas thane thanes thang thangkas
+thangs thankers thans thebe thee thema themed themes therme thete thinks thrash thunk thunks thurible thyme
+tight tiki tirl tissue tissues toady todays toddy tody tokay tortures tower towers trank tranks trashed
+trashes trashing trashy trass treated trog trogs troubled troubler troublers troubles troule troutlet tugged
+tunny twank twanks ugged unction unctions undate underhand undersaid underspend understanded understander
+understands understate understated understood undertane updarted updated updater updaters updates uprate
+uselessly usheress vale vender venisons versin versines versings versins versional versioned versioner
+versioners versionist vide vireo vireos virl vower vowers waesome wale warking wartless wean weaning weid
+weir weirdo weirds weirdy weired weirs wight wikis wili wonderfully wonderous wontless wording wordings
+wordless workings workless worming worrying worsing worsting worthies worthiest worthiness worthing
+worthlessly wrathless wroken yale yams yean yeaning yodel yodels yorking
 `.trim().split(/\s+/));

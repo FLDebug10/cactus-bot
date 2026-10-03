@@ -1,5 +1,5 @@
 import { REAL_WORDS } from "../content/realWords.ts";
-import { CONTRACTIONS, CORRECTION_TARGETS, KNOWN_WORDS, LAUGH_WORDS, SLANG } from "../content/words.ts";
+import { CONTRACTIONS, CORRECTION_TARGETS, KNOWN_WORDS, LAUGH_WORDS, LEADING_FILLERS, SLANG } from "../content/words.ts";
 import { Speller } from "./speller.ts";
 
 export interface Clause {
@@ -49,6 +49,33 @@ const QUESTION_OPENERS = new Set([
 ]);
 
 const LAUGH_EMOJI = new Set(["😂", "🤣", "😭", "💀", "😹", "😆"]);
+
+const WH_WORDS = new Set(["who", "what", "when", "where", "which", "whose", "why", "how"]);
+const ASKED_PRONOUNS = new Set(["you", "i", "we", "it", "they", "he", "she", "this", "that", "there", "someone", "anyone"]);
+
+// The word a clause really opens with: "grove what time is it" opens with
+// "what". The name only steps aside for a question ("grove can you dance"),
+// not for a sentence about Grove ("grove is cute", "grove can dance").
+function openerOf(clause: readonly string[]): string {
+  for (let index = 0; index < clause.length; index++) {
+    const token = clause[index]!;
+    if (token === "grove") {
+      const next = clause[index + 1];
+      const asks = next !== undefined && (WH_WORDS.has(next) || (QUESTION_OPENERS.has(next) && ASKED_PRONOUNS.has(clause[index + 2] ?? "")));
+      if (asks) continue;
+      return token;
+    }
+    if (LEADING_FILLERS.has(token) && index < clause.length - 1) continue;
+    return token;
+  }
+  return clause[0] ?? "";
+}
+
+// "ur adorable do u think u'll fit in my pocket" is two thoughts with no
+// punctuation between them. A question to "you" starting mid-sentence opens a
+// new clause, unless the sentence already had its own question word.
+const SPLITTING_AUXILIARIES = new Set(["do", "does", "did", "can", "could", "will", "would", "are", "is", "have", "has", "should"]);
+const QUESTION_WORDS = new Set(["what", "where", "when", "why", "how", "who", "which", "whose", "whom", "if", "whether"]);
 
 const speller = new Speller(new Set([...KNOWN_WORDS, ...REAL_WORDS, ...Object.keys(SLANG), ...Object.keys(CONTRACTIONS), ...GROVE_NAMES]), CORRECTION_TARGETS);
 
@@ -117,14 +144,19 @@ export function read(raw: string, groveId: string | null): Reading {
 
   const closeClause = () => {
     if (clause.length > 0) {
-      const opener = clause[0]!;
-      clauses.push({ tokens: clause, text: clause.join(" "), question: clauseQuestion || QUESTION_OPENERS.has(opener) });
+      clauses.push({ tokens: clause, text: clause.join(" "), question: clauseQuestion || QUESTION_OPENERS.has(openerOf(clause)) });
     }
     clause = [];
     clauseQuestion = false;
   };
 
-  for (const rawToken of rawTokens) {
+  for (let position = 0; position < rawTokens.length; position++) {
+    const rawToken = rawTokens[position]!;
+    const nextRaw = rawTokens[position + 1];
+    if (SPLITTING_AUXILIARIES.has(rawToken) && (nextRaw === "you" || nextRaw === "u") && clause.length >= 2 && !clause.some(token => QUESTION_WORDS.has(token))) {
+      closeClause();
+      pendingBoundary = true;
+    }
     if (/^[?!.,;:]+$/.test(rawToken)) {
       if (rawToken.includes("?")) {
         questionMark = true;
@@ -142,6 +174,10 @@ export function read(raw: string, groveId: string | null): Reading {
     let possessive = false;
     if (word.endsWith("'s") && CONTRACTIONS[word] === undefined) {
       word = word.slice(0, -2);
+      possessive = true;
+    } else if (word === "groves" && nextRaw !== "of") {
+      // "if slimekin are groves cousins": chat drops the apostrophe.
+      word = "grove";
       possessive = true;
     }
     word = unstretch(word);

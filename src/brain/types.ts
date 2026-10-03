@@ -34,6 +34,8 @@ export interface Decision {
   replyToMessageId: string;
   text: string | null;
   reactions: readonly string[];
+  // Images from assets/ to attach to the reply, by file name.
+  files: readonly string[];
   delayMs: number;
   // When set, the adapter waits this long and asks `stillUnanswered` before
   // speaking, so Grove only helps when no person stepped in first.
@@ -45,6 +47,11 @@ export interface DecisionMeta {
   // The messages this decision answers: the trigger plus any fragments merged into it.
   covers: readonly string[];
   act: string;
+  // What the reply answered, so a follow-up ("what about tomorrow?") can ask it again about something else.
+  intent: string;
+  slots: Readonly<Record<string, string>>;
+  // The question as Grove understood it, e.g. "what is your favorite food".
+  question: string;
   topic: string | null;
   channelId: string;
   toUserId: string;

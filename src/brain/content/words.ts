@@ -26,6 +26,8 @@ export const CONTRACTIONS: Readonly<Record<string, readonly string[]>> = table({
   "weren't": ["were", "not"], werent: ["were", "not"], "haven't": ["have", "not"], havent: ["have", "not"],
   "hasn't": ["has", "not"], hasnt: ["has", "not"], "ain't": ["is", "not"], aint: ["is", "not"],
   "y'all": ["you", "all"], yall: ["you", "all"], "ya'll": ["you", "all"],
+  "u'll": ["you", "will"], "u're": ["you", "are"], "u've": ["you", "have"], "u'd": ["you", "would"],
+  "ur'e": ["you", "are"], "you'r": ["you", "are"],
 });
 
 // Chat shorthand and slang, expanded into the words they stand for.
@@ -85,6 +87,8 @@ export const SLANG: Readonly<Record<string, readonly string[]>> = table({
   howdy: ["howdy"], cmon: ["come", "on"], c: ["see"], n: ["and"],
   gf: ["girlfriend"], bf: ["boyfriend"], bff: ["best", "friend"], fav: ["favorite"], fave: ["favorite"],
   favourite: ["favorite"], favorit: ["favorite"], favrite: ["favorite"],
+  spieces: ["species"], speices: ["species"], specis: ["species"], spiecies: ["species"], specie: ["species"],
+  adorbs: ["adorable"], smol: ["small"], lil: ["little"], cutie: ["cutie"], goober: ["goober"],
 });
 
 // Laughter, in all its spellings. "😭" and "💀" count: that is how people laugh now.
@@ -200,5 +204,5 @@ export const CORRECTION_TARGETS = new Set(words(`
   annoying terrible horrible awful boring weird creepy ugly disgusting trash garbage worthless pathetic
   merling enderian arachnid avian blazeborn buzzborne elytrian feline human phantom shulk slimekin
   slime frog frogs basketball favourite birthday sentient conscious robot artificial program
-  jam jams entry entries contest
+  jam jams entry entries contest species subspecies pocket pockets leafy sprout
 `));

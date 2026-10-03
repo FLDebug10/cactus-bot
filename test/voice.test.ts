@@ -17,7 +17,11 @@ describe("voice", () => {
   });
 
   it("keeps emoticon faces intact", () => {
-    assert.equal(speak("YAY :D", calm, () => 0.99), "yay :D");
+    assert.equal(speak("Yay :D", calm, () => 0.99), "yay :D");
+  });
+
+  it("keeps words shouted in capitals on purpose", () => {
+    assert.equal(speak("Frogs EAT slimes. AAAA", calm, () => 0.99), "frogs EAT slimes. AAAA");
   });
 
   it("uses at most one custom emoji", () => {

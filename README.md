@@ -4,6 +4,28 @@ Grove is the slime who lives in the **Overgrown's Origins** Discord server: a li
 
 Grove does **not** use an LLM. Its "brain" is a rule and pattern engine (see [How Grove thinks](#how-grove-thinks)), so it runs on a tiny server with no GPU.
 
+## Credits
+
+Grove is a group effort:
+
+- **Drizzo** (`_drizzo_`) drew Grove, created the character, and wrote the first code.
+- **FLD10** (`_fld10_`) hosts Grove ("feeds him"), set up the repo, and ported the old Carl-bot commands.
+- **Overgrown** (`0vergrown`) gave Grove its brain and personality, on top of Drizzo and FLD10's work.
+
+Grove knows all three by their Discord IDs (`CREW` in `src/config.ts`) and greets them as family.
+
+## Who Grove is
+
+Grove's answers about itself all come from one canon, so it never contradicts itself. Change it in `src/brain/content/knowledge.ts` (`LORE`, `TRAITS`, `BELONGINGS`, `HOW_GROVE`, `STORIES`).
+
+- A **pure slime**: the bouncy mob kind, not slime people. The Slimekin are its cousins (and its favorite origin).
+- Moss, a few flowers, and one leaf grew on it by themselves. The leaf came from a seed that landed on it.
+- Its favorite thing in the world is the **Orb of Origin**, which it holds all the time.
+- Scared of **frogs** (they eat slimes) and salt.
+- Its birthday is **September 27th, 2026**, the day Drizzo wrote its first code. It knows how old it is.
+- It has no gender, so it picks one each morning as a mood (see `state/day.ts`).
+- A cactus lived on the server before Grove. Grove has never been a cactus.
+
 ## Running it
 
 | Command | What it does |
@@ -23,7 +45,7 @@ Grove does **not** use an LLM. Its "brain" is a rule and pattern engine (see [Ho
 | `DATABASE_PATH` | `data/database.db` | SQLite file. In Docker this is `/app/data/database.db`, kept by the compose volume. |
 | `GROVE_TIMEZONE` | `America/New_York` | Grove's sense of morning and night. |
 | `GROVE_HELP_UNANSWERED` | `true` | Grove answers obvious "where does this go?" questions that nobody answered within 45 seconds. |
-| `GROVE_MODERATE_MEDIA` | `true` | Removes text-only posts from the media gallery. Needs **Manage Messages** there. |
+| `GROVE_MODERATE_MEDIA` | `true` | Removes text-only posts from the media gallery and posts the `!media` rules (they delete themselves after 30 s). Needs **Manage Messages** there. People who can Manage Messages themselves are never moderated, so test it from a normal account. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 
 Channel, role, tag and emoji IDs live in `src/config.ts`.
@@ -61,15 +83,17 @@ Every message goes through the same steps:
 1. **Read** (`brain/text/reader.ts`). Strip mentions, links and code, unroll "heyyyy", expand contractions and slang ("ur", "wdym", "hru"), and repair typos toward the words that matter ("datpack", "sugestion"). Real English words are never "corrected": `realWords.ts` lists the ones that sit a typo away from a target, and a test checks all ~275k English words.
 2. **Understand** (`brain/understand/`).
    - *Addressing*: is Grove being talked **to** (@mention, a reply to Grove, "hey grove", "grove, ...", or mid-conversation), talked **about** ("grove is so cute"), or not involved?
-   - *Intents*: ordered sentence frames on the cleaned text ("are you X", "you are X", "how is your day", "where do I X"...). The word in "are you X" decides the meaning through the lexicons: "are you a girl" is a gender question, "are you dumb" a jab, "you are funny" a compliment.
+   - *Intents*: ordered sentence frames on the cleaned text ("are you X", "you are X", "how is your day", "where do I X"...). The word in "are you X" decides the meaning through the lexicons: "are you a girl" is a gender question, "are you dumb" a jab, "you are funny" a compliment. A question counts as one by its question word, so "grove what time is it" needs no question mark.
+   - *Plans*: one message can hold several things. "ur adorable, do u think u'll fit in my 40 pockets?" gets a quick thank-you and then the real answer, and two questions in one message get two answers.
    - *Topics*: what it is about (datapacks, addons, a bug, the jam...) and **whose** problem it is: "my datapack crashes" goes to datapack support, "Origins crashes" to bug reports, and an unclear "my game crashes" gets a question back.
 3. **Remember** (`brain/state/`).
    - *Conversations*: what was said in each channel, every line Grove said and to whom, and what it **meant** (its "gloss"), so "tf does that even mean?" from anyone gets a real explanation. Several people can talk to Grove at once, and someone can chime in on a reply meant for someone else.
    - *Expectations*: when Grove asks something ("is it your pack or the mod?"), the next answer is read as the answer.
+   - *Follow-ups*: every line remembers the question it answered, so "what about tomorrow?", "and color?" or "tell me more" re-ask that question about the new thing.
    - *Mood*: how good Grove feels and how much energy it has. Kindness and meanness move it, and it drifts back to bubbly. Repeated meanness makes Grove go quiet for a while until someone apologizes.
    - *Day*: what Grove did today and the gender it feels like today (it is a slime, so it picks one each morning). The same all day, new tomorrow.
    - *Memory* (SQLite): names, nicknames, how warm Grove feels toward each person, and the messages it failed to understand.
-4. **Respond** (`brain/respond/`). Each intent has a responder that picks from varied lines without repeating itself. Then the voice filter makes it Grove: lowercase, no em dashes or semicolons, at most one custom emoji, and a small flourish that follows its mood (never on sad news or help answers).
+4. **Respond** (`brain/respond/`). Each intent has a responder that picks from varied lines without repeating itself. Silly questions get answers in character: what Grove has ("do you have pockets?"), what scares it, what it would do as a human, the time and weather in its moss patch, small requests ("say something", "tell me a story", "count to 10"), and roleplay ("*puts grove in pocket*"). Then the voice filter makes it Grove: lowercase (a word written in capitals on purpose, like "frogs EAT slimes", stays), no em dashes or semicolons, at most one custom emoji, and a small flourish that follows its mood (never on sad news or help answers).
 
 ### When Grove speaks up
 
@@ -87,7 +111,8 @@ Grove never pings anyone.
 ## Teaching Grove something new
 
 - **A new kind of message**: add a frame to `FRAMES` in `src/brain/understand/intents.ts` (and the id to `IntentId`), then a responder in the matching `src/brain/respond/*.ts` file.
-- **New facts**: `src/brain/content/knowledge.ts` (mods, origins, server) or the glossary in `src/brain/respond/help.ts`.
+- **New facts**: `src/brain/content/knowledge.ts` (mods, origins, server, and Grove's own canon) or the glossary in `src/brain/respond/help.ts`.
+- **Things Grove can do**: `ABILITIES` in `src/brain/content/lexicon.ts` answers "can you X?", "do you X?" and "X!" all at once.
 - **New slang or words**: `src/brain/content/words.ts` and `lexicon.ts`. If you add a word to `CORRECTION_TARGETS`, run `npm run speller`.
 - **See what Grove got wrong**: staff can run `!misses` in Discord.
 - Add a test next to the ones in `test/conversation.test.ts`, and try it out with `npm run chat`.

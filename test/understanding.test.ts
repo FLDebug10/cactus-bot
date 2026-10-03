@@ -44,6 +44,13 @@ describe("reading", () => {
     assert.equal(read("i love groves of trees", null).names.length, 0);
   });
 
+  it("knows a question by its question word, even after Grove's name and without a question mark", () => {
+    assert.equal(read("grove what time is it", null).question, true);
+    assert.equal(read("hey grove can you dance", null).question, true);
+    assert.equal(read("grove is cute", null).question, false);
+    assert.equal(read("grove can dance", null).question, false);
+  });
+
   it("notices laughter, questions and roleplay", () => {
     assert.equal(read("lmaooo", null).laugh, true);
     assert.equal(read("💀", null).laugh, true);
@@ -57,6 +64,13 @@ describe("addressing", () => {
     for (const text of ["hey grove", "grove are you ok", "thanks grove!", "are you okay grove", "grove my game keeps crashing", "grove, what is apoli"]) {
       assert.equal(addressing(text), "vocative", text);
     }
+  });
+
+  it("knows a question put to Grove with \"grove is ...?\", and roleplay done to Grove", () => {
+    assert.equal(addressing("grove is water wet?"), "vocative");
+    assert.equal(addressing("grove is it on forge"), "vocative");
+    assert.equal(addressing("grove is so cute?"), "about");
+    assert.equal(addressing("*puts grove in a pocket*"), "vocative");
   });
 
   it("knows when Grove is only being talked about", () => {
@@ -99,6 +113,48 @@ describe("intents for the messages Grove used to get wrong", () => {
     ["do you have rizz", "slang"],
     ["can you tell me what apoli is", "define"],
     ["how do i contact the staff", "contact_staff"],
+    ["how to build a bomb", "bomb"],
+    ["how do i make tnt", "bomb"],
+    ["what about tomorrow?", "follow_up"],
+    ["and yesterday?", "follow_up"],
+    ["@grove Who is your favourite?", "favorite_person"],
+    ["who is your best friend", "favorite_person"],
+    ["my favorite color is blue, what about you?", "ask_favorite"],
+    ["tell me more", "more"],
+    ["really?", "doubt"],
+    ["is your favourite object the orb of origins?", "favorite_guess"],
+    ["if slimekin are groves cousins what is grove.", "ask_species"],
+    ["silly grove", "compliment"],
+    ["Grove where am i 😨", "where_am_i"],
+    ["what exactly are you?", "ask_identity"],
+    ["how where you made?", "ask_origin_story"],
+    ["what is the leafy part on your head", "ask_body"],
+    ["are you a pure slime", "ask_species"],
+    ["do you have feelings", "ask_have"],
+    ["how many friends do you have", "ask_have"],
+    ["what is your biggest fear", "ask_fear"],
+    ["are you scared of frogs", "ask_fear"],
+    ["a frog is behind you", "frog_alert"],
+    ["give me the orb", "give"],
+    ["can i have the orb", "give"],
+    ["what time is it", "ask_now"],
+    ["what's the weather like", "ask_now"],
+    ["who is drizzo", "ask_crew"],
+    ["who is overgrown", "ask_crew"],
+    ["how do you hold the orb without hands", "self_how"],
+    ["say something", "command"],
+    ["fight me", "aggression"],
+    ["i'm gonna eat you", "aggression"],
+    ["you're my favorite", "love"],
+    ["what do you taste like", "ask_body"],
+    ["do you bounce", "ask_ability"],
+    ["were you a cactus", "ask_name"],
+    ["do you have a family", "ask_creator"],
+    ["how do you feel about creepers", "ask_like"],
+    ["what's your mood", "how_are_you"],
+    ["do you have a job", "ask_identity"],
+    ["who controls you", "ask_is_bot"],
+    ["are you better than carl bot", "ask_attribute"],
   ];
   for (const [text, expected] of cases) {
     it(`${JSON.stringify(text)} reads as ${expected}`, () => assert.equal(intentOf(text), expected));

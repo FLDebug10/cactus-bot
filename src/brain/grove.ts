@@ -4,7 +4,7 @@ import { interpret, type Intent, type IntentId, weightOf } from "./understand/in
 import { sentimentOf } from "./understand/sentiment.ts";
 import { findTopics, type Topics } from "./understand/topics.ts";
 import { Conversations, type SeenMessage, type Session } from "./state/conversation.ts";
-import { dayKey, dayProfile, hourIn } from "./state/day.ts";
+import { calendarIn, dayKey, dayProfile, hourIn } from "./state/day.ts";
 import { type Friend, type Memory, newFriend } from "./state/memory.ts";
 import { Mood } from "./state/mood.ts";
 import { FUN } from "./respond/fun.ts";
@@ -14,6 +14,7 @@ import { SELF } from "./respond/self.ts";
 import { answerExpectation, SOCIAL } from "./respond/social.ts";
 import { displayName, EMOJI, type Reply, type Responder, type Turn } from "./respond/turn.ts";
 import { speak } from "./respond/voice.ts";
+import { LINKS } from "../config.ts";
 import type { ChatMessage, Clock, Decision, Random } from "./types.ts";
 
 export interface GroveOptions {
@@ -45,12 +46,26 @@ const CONTINUATION_OK = new Set<IntentId>([
   "aggression", "help", "problem", "suggestion", "media", "jam_info", "jam_submit", "jam_chat", "define",
   "download", "versions", "install", "commands", "contact_staff", "origin_list", "best_origin", "how_to",
   "where_to", "distress", "laugh", "share_feeling", "claim_about_grove", "why", "channels", "compat",
+  "bomb", "follow_up", "favorite_person", "more", "doubt", "where_am_i", "ask_origin_story", "ask_body", "ask_size",
+  "can_i_you", "hypothetical", "favorite_guess", "ask_have", "ask_fear", "frog_alert", "give", "ask_now", "ask_crew", "self_how",
 ]);
 
 // Reactions that, right under one of Grove's messages, are about that message.
-const REACTIONS_TO_GROVE = new Set<IntentId>(["confused", "why", "laugh"]);
+const REACTIONS_TO_GROVE = new Set<IntentId>(["confused", "why", "laugh", "follow_up", "more", "doubt"]);
 
-const ABOUT_GROVE_QUESTIONS = new Set<IntentId>(["ask_is_bot", "ask_alive", "ask_gender", "ask_identity", "ask_species", "ask_age", "ask_name", "ask_creator", "claim_about_grove"]);
+// The words a follow-up can swap in when Grove's answer was about a day.
+const TIME_WORDS = /\b(today|tonight|tomorrow|yesterday|right now|now)\b/;
+const TIME_FOCUS = /^(today|tonight|tomorrow|yesterday|right now|now|last night)$/;
+
+// The detail a follow-up replaces: "what about color?" after "what is your favorite food".
+const SWAPPABLE_SLOTS = ["thing", "term", "verb", "word", "task", "feeling"] as const;
+// Last words a follow-up must not replace: "how old are you" + "what about drizzo" is not "how old are drizzo".
+const UNSWAPPABLE_ENDINGS = new Set(["you", "me", "it", "that", "this", "there", "them", "him", "her", "us", "grove", "today", "now"]);
+
+const ABOUT_GROVE_QUESTIONS = new Set<IntentId>([
+  "ask_is_bot", "ask_alive", "ask_gender", "ask_identity", "ask_species", "ask_age", "ask_name", "ask_creator", "claim_about_grove",
+  "ask_fear", "ask_body", "ask_size", "ask_origin_story", "ask_have",
+]);
 
 const FRAGMENT_WINDOW = 8_000;
 const UNANSWERED_WAIT = 45_000;
@@ -145,28 +160,30 @@ export class Grove {
       inConversation: this.conversations.inConversation(message.channelId, message.authorId, now),
     });
 
-    const primary = pickPrimary(intents);
-    if (primary === null) return null;
+    const plan = planFor(intents);
+    if (plan === null) return null;
+    const primary = plan.primary;
 
     const session = this.conversations.session(message.channelId, message.authorId);
 
     // "tf does that even mean", typed right under Grove's message without the
     // reply button, is still about what Grove just said.
     if (addressing === "none" && REACTIONS_TO_GROVE.has(primary.id) && this.rightAfterGrove(message, now)) {
-      return this.respondTo(message, reading, primary, intents, topics, "continuation", greeted, session, replyToId, now, parts);
+      return this.respondTo(message, reading, plan, intents, topics, "continuation", greeted, session, replyToId, now, parts);
     }
 
-    if (addressing === "none") return this.unprompted(message, reading.question, primary, intents, topics, reading, now, session, greeted);
-    if (addressing === "about") return this.overheard(message, primary, intents, topics, reading, now, session, greeted);
+    if (addressing === "none") return this.unprompted(message, reading.question, plan, intents, topics, reading, now, session, greeted);
+    if (addressing === "about") return this.overheard(message, plan, intents, topics, reading, now, session, greeted);
     if (addressing === "continuation" && !this.worthContinuing(primary, session, now)) return null;
-    return this.respondTo(message, reading, primary, intents, topics, addressing, greeted, session, replyToId, now, parts);
+    return this.respondTo(message, reading, plan, intents, topics, addressing, greeted, session, replyToId, now, parts);
   }
 
-  private respondTo(message: ChatMessage, reading: Reading, primary: Intent, intents: readonly Intent[], topics: Topics, addressing: Addressing, greeted: boolean, session: Session, replyToId: string | null, now: number, parts: readonly SeenMessage[]): Decision | null {
+  private respondTo(message: ChatMessage, reading: Reading, plan: Plan, intents: readonly Intent[], topics: Topics, addressing: Addressing, greeted: boolean, session: Session, replyToId: string | null, now: number, parts: readonly SeenMessage[]): Decision | null {
+    const primary = plan.primary;
     if (session.sulkingUntil > now && primary.id !== "apologize" && primary.id !== "distress") return null;
     if (this.conversations.spokeRecently(message.channelId, now, 60_000) >= 10 && addressing !== "direct") return null;
 
-    const turn = this.buildTurn(message, reading, primary, intents, topics, addressing, greeted, session, replyToId, now);
+    const turn = this.buildTurn(message, reading, plan, intents, topics, addressing, greeted, session, replyToId, now);
     const reply = this.choose(turn);
     if (reply === null) return null;
     return this.finish(turn, reply, 0, parts.map(part => part.id));
@@ -197,6 +214,9 @@ export class Grove {
       toUserId: decision.meta.toUserId,
       toUserName: decision.meta.toUserName,
       act: decision.meta.act,
+      intent: decision.meta.intent,
+      slots: decision.meta.slots,
+      question: decision.meta.question,
       topic: decision.meta.topic,
       text: decision.text,
       gloss: decision.meta.gloss,
@@ -234,10 +254,10 @@ export class Grove {
 
   // Grove was named in passing. A heart for kind words, a sad face for mean
   // ones, and a hand raised for questions about itself. Never a flood.
-  private overheard(message: ChatMessage, primary: Intent, intents: readonly Intent[], topics: Topics, reading: Reading, now: number, session: Session, greeted: boolean): Decision | null {
+  private overheard(message: ChatMessage, plan: Plan, intents: readonly Intent[], topics: Topics, reading: Reading, now: number, session: Session, greeted: boolean): Decision | null {
     const last = this.lastAboutReaction.get(message.channelId) ?? 0;
     if (now - last < 2 * 60_000) return null;
-    const kind = primary.id;
+    const kind = (plan.lead ?? plan.primary).id;
 
     if (kind === "compliment" || kind === "love") {
       this.lastAboutReaction.set(message.channelId, now);
@@ -248,14 +268,14 @@ export class Grove {
       this.lastAboutReaction.set(message.channelId, now);
       this.mood.feel("insult", message.authorName, now);
       if (this.picker.chance(0.3)) {
-        const turn = this.buildTurn(message, reading, primary, intents, topics, "about", greeted, session, message.replyToId, now);
+        const turn = this.buildTurn(message, reading, plan, intents, topics, "about", greeted, session, message.replyToId, now);
         return this.finish(turn, { text: this.picker.pick("overheard.mean", ["i can hear you, you know :(", "hey!! i'm right here :("]), gloss: "i heard that and it was mean", act: "overheard.mean" }, 0);
       }
       return reactionOnly(message, ["🥺"], "overheard.mean");
     }
     if (ABOUT_GROVE_QUESTIONS.has(kind) && reading.question && this.picker.chance(0.7)) {
       this.lastAboutReaction.set(message.channelId, now);
-      const turn = this.buildTurn(message, reading, primary, intents, topics, "about", greeted, session, message.replyToId, now);
+      const turn = this.buildTurn(message, reading, plan, intents, topics, "about", greeted, session, message.replyToId, now);
       const reply = this.choose(turn);
       if (reply === null || reply.silent) return null;
       reply.text = `${this.picker.pick("overheard.lead", ["ooh, that's me! ", "hi, that's me! ", ""])}${reply.text}`;
@@ -266,14 +286,15 @@ export class Grove {
 
   // Nobody talked to Grove, but someone asked where something goes. Wait and
   // see if a person answers first. Grove only steps in when nobody did.
-  private unprompted(message: ChatMessage, question: boolean, primary: Intent, intents: readonly Intent[], topics: Topics, reading: Reading, now: number, session: Session, greeted: boolean): Decision | null {
+  private unprompted(message: ChatMessage, question: boolean, plan: Plan, intents: readonly Intent[], topics: Topics, reading: Reading, now: number, session: Session, greeted: boolean): Decision | null {
+    const primary = plan.primary;
     if (!this.helpUnanswered || !question || this.isSupportChannel(message)) return null;
     if (!UNPROMPTED_HELP.has(primary.id) || primary.confidence < 0.75) return null;
     if (message.replyToId !== null || message.mentionedUserIds.length > 0) return null;
     if (now - (this.lastUnprompted.get(message.channelId) ?? 0) < 15 * 60_000) return null;
     if (now - (this.lastUnprompted.get(`user:${message.authorId}`) ?? 0) < 30 * 60_000) return null;
 
-    const turn = this.buildTurn(message, reading, primary, intents, topics, "none", greeted, session, null, now);
+    const turn = this.buildTurn(message, reading, { primary, lead: null, also: null }, intents, topics, "none", greeted, session, null, now);
     const reply = this.choose(turn);
     if (reply === null || reply.silent || reply.miss || (reply.expect !== undefined && reply.expect !== null)) return null;
 
@@ -284,14 +305,16 @@ export class Grove {
     return this.finish(turn, reply, UNANSWERED_WAIT);
   }
 
-  private buildTurn(message: ChatMessage, reading: Reading, primary: Intent, intents: readonly Intent[], topics: Topics, addressing: Addressing, greeted: boolean, session: Session, replyToId: string | null, now: number): Turn {
+  private buildTurn(message: ChatMessage, reading: Reading, plan: Plan, intents: readonly Intent[], topics: Topics, addressing: Addressing, greeted: boolean, session: Session, replyToId: string | null, now: number): Turn {
     const friend: Friend = this.memory.friend(message.authorId) ?? newFriend(message.authorId, message.authorName, now);
     const repliedTo = replyToId !== null ? this.conversations.find(message.channelId, replyToId) ?? null : null;
     return {
       message,
       reading,
-      intent: primary,
+      intent: plan.primary,
       intents,
+      lead: plan.lead,
+      also: plan.also,
       topics,
       sentiment: sentimentOf(reading),
       greeted,
@@ -301,7 +324,10 @@ export class Grove {
       session,
       mood: this.mood.snapshot(now),
       day: dayProfile(dayKey(now, this.timezone)),
+      dayAt: offset => dayProfile(dayKey(now + offset * 86_400_000, this.timezone)),
+      topFriends: limit => this.memory.favorites(limit),
       hour: hourIn(now, this.timezone),
+      calendar: calendarIn(now, this.timezone),
       now,
       picker: this.picker,
       repliedTo,
@@ -316,15 +342,94 @@ export class Grove {
     const answered = answerProblemSource(turn) ?? answerHelpTopic(turn) ?? answerExpectation(turn);
     if (answered !== null) return answered;
 
+    if (turn.intent.id === "follow_up") {
+      const resolved = this.resolveFollowUp(turn);
+      const reply = resolved === null ? null : this.choose(resolved);
+      if (resolved !== null && reply !== null) {
+        reply.act ??= resolved.intent.id;
+        reply.about ??= { intent: resolved.intent.id, slots: resolved.intent.slots, question: questionOf(resolved) };
+        return reply;
+      }
+    }
+
     const responder = RESPONDERS[turn.intent.id];
     const reply = responder?.(turn) ?? null;
-    if (reply !== null) return reply;
+    if (reply !== null) return this.withSecondAnswer(turn, reply);
 
     const topical = topicalFallback(turn);
     if (topical !== null) return topical;
 
     if (turn.intent.id === "statement" || turn.intent.id === "slang") return RESPONDERS.statement!(turn);
     return unknownQuestion(turn);
+  }
+
+  // "what's the leafy part on your head? are you a sub-species?": answer both.
+  private withSecondAnswer(turn: Turn, reply: Reply): Reply {
+    const second = turn.also;
+    if (second === null || reply.silent === true) return reply;
+    const extra = RESPONDERS[second.id]?.({ ...turn, intent: second, also: null }) ?? null;
+    if (extra === null || extra.silent === true || extra.text.length === 0 || extra.act === reply.act) return reply;
+    const first = /[.!?)*]$/.test(reply.text.trim()) ? reply.text.trim() : `${reply.text.trim()}.`;
+    const joined = `${first} ${this.picker.pick("also", ["oh, and ", "and ", "also, "])}${extra.text}`;
+    if (joined.length > 600) return reply;
+    return {
+      ...reply,
+      text: joined,
+      gloss: reply.gloss !== undefined && reply.gloss !== null && extra.gloss ? `${reply.gloss}, and ${extra.gloss}` : reply.gloss ?? extra.gloss ?? null,
+      files: [...(reply.files ?? []), ...(extra.files ?? [])],
+      miss: reply.miss === true && extra.miss === true,
+    };
+  }
+
+  // "what about tomorrow?" / "and color?": take the question Grove last answered
+  // for this person, swap in the new detail, and read it as a fresh question.
+  private resolveFollowUp(turn: Turn): Turn | null {
+    const focus = (turn.intent.slots["focus"] ?? "").replace(/^(the|your|a|an) /, "").trim();
+    if (focus.length === 0) return null;
+    const recentHere = turn.lastLineHere !== null && turn.now - turn.lastLineHere.at < 90_000 ? turn.lastLineHere : null;
+    const line = turn.repliedLine ?? turn.lastLineToThem ?? recentHere;
+
+    let question = focus;
+    if (line !== null && line.question.length > 0) {
+      if (TIME_FOCUS.test(focus)) {
+        question = TIME_WORDS.test(line.question) ? line.question.replace(TIME_WORDS, focus) : `${line.question} ${focus}`;
+      } else {
+        const detail = SWAPPABLE_SLOTS.map(slot => line.slots[slot]).find(value => value !== undefined && value.length > 0);
+        const words = line.question.split(" ");
+        const last = words[words.length - 1] ?? "";
+        if (detail !== undefined && line.question.includes(detail)) question = line.question.replace(detail, focus);
+        else if (words.length >= 3 && !UNSWAPPABLE_ENDINGS.has(last)) question = [...words.slice(0, -1), focus].join(" ");
+      }
+    }
+
+    const reading = read(question, this.groveId);
+    const topics = findTopics(reading.text, reading.tokens);
+    const primary = pickPrimary(interpret(reading, topics).intents);
+    if (primary === null || primary.id === "follow_up") return null;
+    return { ...turn, reading, topics, intent: primary, intents: [primary], lead: null, also: null, sentiment: sentimentOf(reading) };
+  }
+
+  // A few words for the compliment, thanks or love that came along with a question.
+  private leadIn(turn: Turn, kind: IntentId): string {
+    switch (kind) {
+      case "compliment":
+        this.mood.feel("compliment", turn.name, turn.now);
+        turn.friend.affinity = Math.min(1, turn.friend.affinity + 0.05);
+        return this.picker.pick("lead.compliment", ["aww thank you!! ", "hehe, you're sweet! ", "eee thank you! "]);
+      case "love":
+        this.mood.feel("love", turn.name, turn.now);
+        turn.friend.affinity = Math.min(1, turn.friend.affinity + 0.08);
+        return this.picker.pick("lead.love", ["love you too!! ", "aww, love you too! "]);
+      case "thank":
+        this.mood.feel("thanks", turn.name, turn.now);
+        return this.picker.pick("lead.thank", ["you're welcome! ", "anytime! "]);
+      case "laugh":
+        return "hehe ";
+      case "greet":
+        return this.picker.pick("lead.greet", [`hi ${turn.name}! `, "hii! "]);
+      default:
+        return "";
+    }
   }
 
   // Applies what the reply does to Grove (mood, memory, session) and turns it into a Decision.
@@ -337,6 +442,10 @@ export class Grove {
     if (reply.act === "compliment" || reply.act === "love" || turn.intent.id === "apologize") session.insults = [];
     if (reply.sulkMs !== undefined) session.sulkingUntil = now + reply.sulkMs;
     if (turn.intent.id === "apologize") session.sulkingUntil = 0;
+
+    const silent = reply.silent === true || reply.text.trim().length === 0;
+    // The lead-in also moves Grove's feelings, so it is worked out before memory is saved.
+    const lead = !silent && turn.lead !== null ? this.leadIn(turn, turn.lead.id) : "";
 
     // Unprompted help may never be sent (a person might answer first), so it
     // leaves no trace in Grove's memory of who it has talked with.
@@ -353,14 +462,14 @@ export class Grove {
 
     if (reply.miss === true) this.memory.noteMiss(message.channelId, message.authorId, message.content.slice(0, 300), now);
 
-    const silent = reply.silent === true || reply.text.trim().length === 0;
     const reactions = [...(reply.reactions ?? [])];
     if (silent && reactions.length === 0) return null;
 
     let text: string | null = null;
     if (!silent) {
       let body = reply.text;
-      if (turn.greeted && turn.intent.id !== "greet" && turn.intent.id !== "distress" && this.picker.chance(0.5)) {
+      if (lead.length > 0) body = `${lead}${body}`;
+      else if (turn.greeted && turn.intent.id !== "greet" && turn.intent.id !== "distress" && this.picker.chance(0.5)) {
         body = `${this.picker.pick("greet.lead", [`hi ${turn.name}! `, "hii! ", "hello! "])}${body}`;
       }
       const informative = /^(route|define|download|versions|install|modmail|commands|howto|origin_list|server_info|distress|channels)/.test(reply.act ?? "");
@@ -373,11 +482,15 @@ export class Grove {
       replyToMessageId: message.id,
       text,
       reactions,
+      files: silent ? [] : [...(reply.files ?? [])],
       delayMs,
       waitForSilenceMs,
       meta: {
         covers: covers.length > 0 ? covers : [message.id],
         act: reply.act ?? turn.intent.id,
+        intent: reply.about?.intent ?? turn.intent.id,
+        slots: reply.about?.slots ?? turn.intent.slots,
+        question: reply.about?.question ?? questionOf(turn),
         topic,
         channelId: message.channelId,
         toUserId: message.authorId,
@@ -387,6 +500,36 @@ export class Grove {
       },
     };
   }
+}
+
+// Social bits that can preface a real answer: "ur adorable, do u think u'll fit in my pocket?"
+const LEAD_INS = new Set<IntentId>(["compliment", "love", "thank", "laugh", "greet"]);
+// Things that never need answering a second time in the same reply.
+const NOT_A_SECOND_ANSWER = new Set<IntentId>([
+  "compliment", "love", "thank", "greet", "farewell", "insult", "hate", "apologize", "laugh", "ack", "agree", "disagree",
+  "statement", "question", "distress", "confused", "why", "more", "doubt", "follow_up", "slang",
+]);
+
+interface Plan {
+  primary: Intent;
+  lead: Intent | null;
+  also: Intent | null;
+}
+
+function planFor(intents: readonly Intent[]): Plan | null {
+  const best = pickPrimary(intents);
+  if (best === null) return null;
+  let primary = best;
+  let lead: Intent | null = null;
+  if (LEAD_INS.has(best.id)) {
+    const substance = pickPrimary(intents.filter(intent => intent.clause !== best.clause && !LEAD_INS.has(intent.id) && intent.id !== "statement" && intent.id !== "ack"));
+    if (substance !== null) {
+      primary = substance;
+      lead = best;
+    }
+  }
+  const also = pickPrimary(intents.filter(intent => intent.clause !== primary.clause && intent.id !== primary.id && !NOT_A_SECOND_ANSWER.has(intent.id)));
+  return { primary, lead, also };
 }
 
 function pickPrimary(intents: readonly Intent[]): Intent | null {
@@ -402,14 +545,20 @@ function pickPrimary(intents: readonly Intent[]): Intent | null {
   return best;
 }
 
+// The clause Grove actually answered, kept so a follow-up can re-ask it.
+function questionOf(turn: Turn): string {
+  return turn.reading.clauses[turn.intent.clause]?.text ?? turn.reading.text;
+}
+
 function reactionOnly(message: ChatMessage, reactions: readonly string[], act: string): Decision {
   return {
     replyToMessageId: message.id,
     text: null,
     reactions,
+    files: [],
     delayMs: 400,
     waitForSilenceMs: 0,
-    meta: { covers: [message.id], act, topic: null, channelId: message.channelId, toUserId: message.authorId, toUserName: message.authorName, gloss: null, expectation: null },
+    meta: { covers: [message.id], act, intent: act, slots: {}, question: "", topic: null, channelId: message.channelId, toUserId: message.authorId, toUserName: message.authorName, gloss: null, expectation: null },
   };
 }
 
@@ -423,6 +572,26 @@ function unknownQuestion(turn: Turn): Reply {
       text: picker.pick("eightball", ["hmm... my moss says yes!", "my leaf is twitching... that means probably!", "ask me again after my nap", "the orb of origin says... maybe?", "hmm, my moss says not today"]),
       gloss: "it was just a fun guess, i can't really see the future",
       act: "eightball",
+    };
+  }
+  if (/\b(links?|url)\b/.test(text)) {
+    return {
+      text: `which link? i know the handbook (<${LINKS.handbook}>) and where to download the mods (<${LINKS.originsModrinth}>). just ask!`,
+      gloss: "i know the handbook and download links",
+      act: "links",
+    };
+  }
+  const asked = text.replace(/^((grove|hey|so|ok|okay|but|and|wait|also|um|hmm) )+/, "");
+  if (/^(is|are|was|were|does|do|did|can|could|would|will|has|have) /.test(asked) && !/^[a-z]+ (i|we)\b/.test(asked) && !/\b(you|your|yourself|grove)\b/.test(asked)) {
+    return {
+      text: picker.pick("q.guess", [
+        "hmm... i think so? but i'm a slime, so don't quote me on that",
+        "my moss says yes! my moss is wrong a lot though",
+        "probably? you might want to ask someone with a bigger brain than mine hehe",
+      ]),
+      gloss: "it was just a guess, i don't really know",
+      act: "question.guess",
+      miss: true,
     };
   }
   if (/\b(you|your|yourself)\b/.test(text)) {

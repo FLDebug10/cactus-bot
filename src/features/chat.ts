@@ -1,10 +1,13 @@
-import type { Client, Message } from "discord.js";
+import { AttachmentBuilder, type Client, type Message } from "discord.js";
+import { fileURLToPath } from "node:url";
 import type { Grove } from "../brain/grove.ts";
 import type { Decision } from "../brain/types.ts";
 import { toChatMessage } from "../discord/adapt.ts";
 import { logger } from "../logger.ts";
 
 const log = logger("chat");
+
+const asset = (name: string) => fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
 
 interface Pending {
   messageId: string;
@@ -67,6 +70,7 @@ export class GroveChat {
     if (decision.text !== null) {
       const sent = await message.reply({
         content: decision.text,
+        files: decision.files.map(name => new AttachmentBuilder(asset(name), { name })),
         allowedMentions: { parse: [], repliedUser: false },
         failIfNotExists: false,
       });

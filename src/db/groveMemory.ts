@@ -19,6 +19,7 @@ const MAX_MISSES = 500;
 export class SqliteMemory implements Memory {
   private readonly getFriend;
   private readonly putFriend;
+  private readonly topFriends;
   private readonly addMiss;
   private readonly trimMisses;
   private readonly listMisses;
@@ -34,6 +35,7 @@ export class SqliteMemory implements Memory {
         name = excluded.name, nickname = excluded.nickname, last_seen = excluded.last_seen, talks = excluded.talks,
         affinity = excluded.affinity, likes = excluded.likes, last_topic = excluded.last_topic
     `);
+    this.topFriends = db.prepare("SELECT * FROM grove_users ORDER BY affinity DESC, talks DESC LIMIT ?");
     this.addMiss = db.prepare("INSERT INTO grove_misses (at, channel_id, user_id, text) VALUES (?, ?, ?, ?)");
     this.trimMisses = db.prepare(`DELETE FROM grove_misses WHERE id <= (SELECT id FROM grove_misses ORDER BY id DESC LIMIT 1 OFFSET ${MAX_MISSES})`);
     this.listMisses = db.prepare("SELECT at, user_id, text FROM grove_misses ORDER BY id DESC LIMIT ?");
@@ -43,25 +45,11 @@ export class SqliteMemory implements Memory {
 
   friend(userId: string): Friend | null {
     const row = this.getFriend.get(userId) as FriendRow | undefined;
-    if (row === undefined) return null;
-    let likes: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(row.likes);
-      if (Array.isArray(parsed)) likes = parsed.filter((like): like is string => typeof like === "string");
-    } catch {
-      likes = [];
-    }
-    return {
-      userId: row.user_id,
-      name: row.name,
-      nickname: row.nickname,
-      firstSeen: row.first_seen,
-      lastSeen: row.last_seen,
-      talks: row.talks,
-      affinity: row.affinity,
-      likes,
-      lastTopic: row.last_topic,
-    };
+    return row === undefined ? null : toFriend(row);
+  }
+
+  favorites(limit: number): Friend[] {
+    return (this.topFriends.all(limit) as FriendRow[]).map(toFriend);
   }
 
   save(friend: Friend): void {
@@ -96,4 +84,25 @@ export class SqliteMemory implements Memory {
   saveState(key: string, value: string): void {
     this.putState.run(key, value);
   }
+}
+
+function toFriend(row: FriendRow): Friend {
+  let likes: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(row.likes);
+    if (Array.isArray(parsed)) likes = parsed.filter((like): like is string => typeof like === "string");
+  } catch {
+    likes = [];
+  }
+  return {
+    userId: row.user_id,
+    name: row.name,
+    nickname: row.nickname,
+    firstSeen: row.first_seen,
+    lastSeen: row.last_seen,
+    talks: row.talks,
+    affinity: row.affinity,
+    likes,
+    lastTopic: row.last_topic,
+  };
 }

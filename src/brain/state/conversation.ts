@@ -27,6 +27,9 @@ export interface GroveLine {
   toUserId: string;
   toUserName: string;
   act: string;
+  intent: string;
+  slots: Readonly<Record<string, string>>;
+  question: string;
   topic: string | null;
   text: string;
   gloss: string | null;

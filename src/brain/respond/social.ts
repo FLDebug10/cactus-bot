@@ -1,6 +1,8 @@
+import { LINKS } from "../../config.ts";
+import { ageWords, CREW_ROLES, crewMemberById, FUN_FACTS, JOKES } from "../content/knowledge.ts";
 import { FEELINGS } from "../content/lexicon.ts";
 import type { IntentId } from "../understand/intents.ts";
-import { channel, curiousWord, EMOJI, type Reply, type Responder, type Turn } from "./turn.ts";
+import { channel, curiousWord, dayOffsetIn, EMOJI, type Reply, type Responder, safeWord, type Turn } from "./turn.ts";
 
 // Small talk: hellos, goodbyes, feelings, and keeping a conversation going.
 
@@ -20,10 +22,21 @@ function nowActivity(turn: Turn): string {
   }
 }
 
+const CREW_GREETINGS = {
+  drizzo: ["drizzo!! hi hi, it's the one who drew me!", "hi drizzo! my favorite artist :D", "drizzo! *happy wobble* you made me look so cute"],
+  fld10: ["fld10! hi! thanks for the snacks (the electricity)", "hi fld10! my host and food provider!", "fld10!! *bounces* the server's nice and warm today"],
+  overgrown: ["overgrown! hi! my brain says hi too", "hi overgrown! *brain wiggle*", "overgrown!! i've been thinking lots, just like you taught me"],
+} as const;
+
 const greet: Responder = turn => {
   const { picker, name, friend, now } = turn;
   const away = now - friend.lastSeen;
   const part = partOfDay(turn.hour);
+
+  const crew = crewMemberById(turn.message.authorId);
+  if (crew !== null && picker.chance(0.6)) {
+    return { text: picker.pick(`greet.${crew}`, CREW_GREETINGS[crew]), gloss: `i was saying hi to ${CREW_ROLES[crew].name}, who ${CREW_ROLES[crew].theyShort}`, feel: "chat" };
+  }
 
   if (friend.talks === 0) {
     return {
@@ -150,6 +163,28 @@ const howAreYou: Responder = turn => {
 
 const howIsDay: Responder = turn => {
   const { day, picker } = turn;
+  const offset = dayOffsetIn(turn.reading.text);
+  if (offset === 1) {
+    const plan = turn.dayAt(1);
+    return {
+      text: picker.pick("day.tomorrow", [
+        `tomorrow i'll probably be ${plan.afternoon.doing}! slimes don't really plan ahead though`,
+        `hmm, i have a feeling i'll be ${plan.morning.doing} in the morning. after that, who knows!`,
+      ]),
+      gloss: "i don't really plan, but i'll probably be doing slime things tomorrow",
+      act: "how_is_day",
+      feel: "chat",
+    };
+  }
+  if (offset === -1 && !/\bnight\b/.test(turn.reading.text)) {
+    const past = turn.dayAt(-1);
+    return {
+      text: picker.pick("day.yesterday", [`yesterday was nice! i ${past.morning.did}, and later i ${past.afternoon.did}`, `pretty good! i remember that ${past.highlight}`]),
+      gloss: "yesterday was a nice slime day",
+      act: "how_is_day",
+      feel: "chat",
+    };
+  }
   if (/\bnight\b/.test(turn.reading.text)) {
     return {
       text: `${picker.pick("night.story", ["it was cozy!", "really nice!", "so peaceful!"])} i ${day.evening.did}, then slept in my moss bed. ${picker.pick("night.ask", ["how was yours?", "how about you?"])}`,
@@ -174,7 +209,30 @@ const howIsDay: Responder = turn => {
   };
 };
 
-const whatDoing: Responder = turn => ({
+const whatDoing: Responder = turn => {
+  if (dayOffsetIn(turn.reading.text) === 1) {
+    return {
+      text: `tomorrow? probably ${turn.dayAt(1).afternoon.doing}! but i never really know until i wake up`,
+      gloss: "i don't plan much, but i'll probably be doing slime stuff",
+      feel: "chat",
+    };
+  }
+  if (/\b(all day|for fun|free time|every day|usually|on weekends|at night|no one is around)\b/.test(turn.reading.text)) {
+    const { day } = turn;
+    return {
+      text: turn.picker.pick("doing.routine", [
+        `slime stuff! today i ${day.morning.did}, then i ${day.afternoon.did}. most days are moss, naps, and saying hi to people`,
+        `i bounce around saying hi, help people find the right channel, and nap in my moss. today i also ${day.afternoon.did}!`,
+      ]),
+      gloss: "i do slime stuff: moss, naps, and saying hi to people",
+      act: "what_doing",
+      feel: "chat",
+    };
+  }
+  return whatDoingNow(turn);
+};
+
+const whatDoingNow = (turn: Turn): Reply => ({
   text: turn.picker.pick("doing", [
     `just ${nowActivity(turn)}! what about you?`,
     "talking to you! and wobbling a little",
@@ -185,6 +243,35 @@ const whatDoing: Responder = turn => ({
   feel: "chat",
   expect: { kind: "their_feeling" },
 });
+
+// "what time is it?", "how's the weather?": Grove only knows its own corner of the world.
+const now: Responder = turn => {
+  const text = turn.reading.text;
+  const { picker, calendar, day } = turn;
+  const part = partOfDay(turn.hour);
+  const reply = (line: string, gloss: string): Reply => ({ text: line, gloss, act: "ask_now", feel: "chat" });
+  if (/\braining\b/.test(text)) {
+    return reply(day.weather.startsWith("rainy") ? "it rained here today! i sat right in it" : `not here! it's ${day.weather} in my moss patch`, `the weather here is ${day.weather}`);
+  }
+  if (/\b(weather|sunny|snowing|cold|hot|warm|cloudy|stormy|windy)\b/.test(text)) {
+    return reply(picker.pick("weather", [`here it's ${day.weather}! i can't see your window though`, `in my moss patch it's ${day.weather}. how is it where you are?`]), `the weather here is ${day.weather}`);
+  }
+  if (/\b(weekend|weekday)\b/.test(text)) {
+    const weekend = calendar.weekday === "saturday" || calendar.weekday === "sunday";
+    return reply(weekend ? `yes!! it's ${calendar.weekday}! extra nap time` : `nope, it's ${calendar.weekday}. the weekend is coming though!`, `today is ${calendar.weekday}`);
+  }
+  if (/^(grove )?is it (night|day|morning|evening|afternoon)\b/.test(text)) {
+    return reply(`for me it's ${part === "night" ? "nighttime" : part}! the moss patch is ${part === "night" ? "all dark and cozy" : "nice and bright"}`, `it's ${part} where i live`);
+  }
+  if (/\btime\b/.test(text)) {
+    const hour = turn.hour % 12 === 0 ? 12 : turn.hour % 12;
+    const half = turn.hour < 12 ? "am" : "pm";
+    return reply(picker.pick("time", [`around ${hour} ${half} where i live! slime time is mostly nap time though`, `it's ${hour}-something ${half} for me! i don't have a clock, i just look at the sun`]), `it's around ${hour} ${half} where i live`);
+  }
+  if (/\byear\b/.test(text)) return reply(`${calendar.year}! my very first year, i'm only ${ageWords(turn.now)}`, `it's ${calendar.year}`);
+  if (/\bmonth\b/.test(text)) return reply(`it's ${calendar.month}! ${calendar.month === "september" || calendar.month === "october" || calendar.month === "november" ? "the leaves are changing, but mine stays green" : "a very good month for moss"}`, `it's ${calendar.month}`);
+  return reply(picker.pick("date", [`it's ${calendar.weekday}, ${calendar.month} ${calendar.date}! i think. slimes are bad at calendars`, `${calendar.weekday}! ${calendar.month} ${calendar.date}, if my moss is right`]), `today is ${calendar.weekday}, ${calendar.month} ${calendar.date}`);
+};
 
 const thinking: Responder = turn => ({
   text: turn.picker.pick("thinking", [`honestly? ${turn.day.thought}`, `i was wondering... ${turn.day.thought}`, "mostly moss. it's always moss"]),
@@ -248,6 +335,51 @@ const confused: Responder = turn => {
   return { text, gloss: line.gloss, act: "clarify", topic: line.topic, feel: "chat" };
 };
 
+// "where am i 😨"
+const whereAmI: Responder = turn => {
+  const scared = turn.reading.emojis.some(emoji => ["😨", "😰", "😱", "😳", "😟", "🫣"].includes(emoji));
+  const lead = scared ? "don't panic! " : "";
+  return {
+    text: lead + turn.picker.pick("where_am_i", [
+      `you're in <#${turn.message.channelId}>, in the overgrown's origins server! it's safe here`,
+      "on discord, in front of a screen... when you should be outside touching grass and meeting other slimes",
+      "you're in the overgrown's origins discord! home of apoli, origins, and me",
+      "somewhere cozy, with me! that's all that matters",
+    ]),
+    gloss: "you're in the overgrown's origins discord server",
+    act: "where_am_i",
+    feel: "chat",
+  };
+};
+
+// "tell me more": keep going on whatever Grove just said.
+const more: Responder = turn => {
+  const line = turn.repliedLine ?? turn.lastLineToThem;
+  const { picker } = turn;
+  const act = line?.act ?? "";
+  if (act === "joke") return { text: picker.pick("joke", JOKES), gloss: "it was another joke", act: "joke", feel: "chat" };
+  if (act === "fact") return { text: `${picker.pick("fact.more", ["okay okay, another one!", "ooh, here's another!"])} ${picker.pick("fact", FUN_FACTS)}`, gloss: "i shared another fun fact", act: "fact", feel: "chat" };
+  if (act === "how_is_day" || act === "what_doing" || line?.intent === "how_are_you") {
+    return { text: picker.pick("more.day", [`oh and ${turn.day.highlight}!`, `oh, and i keep wondering... ${turn.day.thought}`]), gloss: "i was telling you more about my day", act: "how_is_day", feel: "chat" };
+  }
+  if (act.startsWith("define") || act.startsWith("howto") || act.startsWith("versions") || act.startsWith("install")) {
+    return { text: `the handbook has way more about it than my mossy brain: <${LINKS.handbook}>`, gloss: "the handbook explains it in more detail", act: "define.more", feel: "chat" };
+  }
+  if (act.startsWith("route")) return { text: "that's pretty much it! the people in that channel can help way more than me", gloss: "that channel is the right place for the rest", feel: "chat" };
+  if (act === "gender") return { text: "that's all there is to it! i pick a new one every morning", gloss: "my gender changes every day", act: "gender", feel: "chat" };
+  return { text: picker.pick("more.none", ["hmm, that's all i've got! i'm a slime of few words", "that's it, that's the whole story hehe"]), gloss: null, feel: "chat" };
+};
+
+// "really?": Grove stands by what it said, unless it was joking.
+const doubt: Responder = turn => {
+  const line = turn.repliedLine ?? turn.lastLineToThem;
+  const { picker } = turn;
+  if (line === null) return { text: "really what? hehe", gloss: null, feel: "chat" };
+  if (line.act === "joke") return { text: picker.pick("doubt.joke", ["okay no, it was a joke hehe", "it's a joke! laugh! please?"]), gloss: "that was just a joke", feel: "chat" };
+  if (line.act === "eightball") return { text: "i mean... my moss isn't always right", gloss: "it was just a guess", feel: "chat" };
+  return { text: picker.pick("doubt", ["yep! slime's honor", "for real for real!", "yes really! would this face lie to you?"]), gloss: line.gloss ?? "i meant what i said", feel: "chat" };
+};
+
 // "why?" right after Grove said something: give the reason behind that line.
 const why: Responder = turn => {
   const line = turn.repliedLine ?? turn.lastLineToThem;
@@ -284,6 +416,15 @@ export function answerExpectation(turn: Turn): Reply | null {
 // get curious about it, the way a small creature would.
 const statement: Responder = turn => {
   const { picker, sentiment } = turn;
+  // Replying to Grove's own message, a feeling is usually about that message.
+  if (turn.repliedLine !== null && sentiment > 0.3) {
+    return { text: picker.pick("stmt.aboutme.good", [`aww thank you!! ${EMOJI.heart}`, "hehe, i'm glad you liked it!", "eee, that makes me so happy"]), gloss: "thank you, i'm happy you liked it", feel: "compliment", affinity: 0.04 };
+  }
+  if (turn.repliedLine !== null && sentiment < -0.3) {
+    return { text: picker.pick("stmt.aboutme.bad", ["aw, sorry :( i'll try to do better", "oh no, did i say something wrong?"]), gloss: "sorry if that wasn't helpful", feel: "sad_news" };
+  }
+  const news = newsIn(turn);
+  if (news !== null) return news;
   if (sentiment > 0.3) return { text: picker.pick("stmt.good", ["yay!! that's awesome :D", "ooh nice!!", "that's so cool!", "love that for you!"]), gloss: "that sounds great", feel: "good_news" };
   if (sentiment < -0.3) return { text: picker.pick("stmt.bad", ["aw, that sounds rough :( *pats you with a tiny slime hand*", "oh no :( i'm sorry", "that's not fun at all"]), gloss: "i'm sorry that happened", feel: "sad_news" };
 
@@ -294,11 +435,45 @@ const statement: Responder = turn => {
   if (word !== null && picker.chance(0.35)) {
     return { text: picker.pick("stmt.curious", [`${word}? is that bouncy?`, `ooh, ${word}! i don't think i've ever seen one`, `wait, what's ${word}? is it like moss?`]), gloss: `i was curious what ${word} is`, feel: "chat" };
   }
-  return { text: picker.pick("stmt", ["ooh, tell me more!", "huh, i didn't know that", "interesting! *wobbles thoughtfully*", "mm, i see!", "oh, really?", "hmm, okay!"]), gloss: "i was listening", feel: "chat", miss: true };
+  return {
+    text: picker.pick("stmt", [
+      "ooh, tell me more!",
+      "huh, i didn't know that! *files it away in my moss brain*",
+      "interesting! *wobbles thoughtfully*",
+      "ooh! my leaf perked up, keep going",
+      "oh, really?",
+      "noted! well, as noted as a slime can note things",
+    ]),
+    gloss: "i was listening",
+    feel: "chat",
+    miss: true,
+  };
 };
+
+const PETS = new Set(["dog", "puppy", "cat", "kitten", "bird", "fish", "hamster", "bunny", "rabbit", "turtle", "snake", "lizard", "parrot", "pet"]);
+const NOT_NEWS = new Set(["question", "problem", "idea", "issue", "bug", "doubt", "feeling", "headache", "test", "exam", "cold", "flu", "crash", "error"]);
+
+// "i got a new dog", "i made a datapack": good news gets cheered on.
+function newsIn(turn: Turn): Reply | null {
+  const match = /\bi (?:just )?(?<verb>got|bought|made|built|found|adopted|finished|drew|won|painted|baked|caught|have) (?<article>a |an |my |some )?(?<fresh>new |first |own )?(?<thing>[a-z]+)\b/.exec(turn.reading.text)?.groups;
+  if (match === undefined) return null;
+  const thing = safeWord(match["thing"], 16);
+  const verb = match["verb"] ?? "";
+  if (thing === null || NOT_NEWS.has(thing) || (verb === "have" && match["fresh"] === undefined)) return null;
+  const { picker } = turn;
+  const article = (match["article"] ?? "").trim();
+  const named = article === "a" || article === "an" ? `${article} ${thing}` : thing;
+  const reply = (text: string): Reply => ({ text, gloss: `i was happy about your ${thing}`, feel: "good_news" });
+  if (thing === "frog" || thing === "frogs") return reply("a FROG?? please keep it far away from me");
+  if (PETS.has(thing)) return reply(picker.pick("news.pet", [`${named}?! that's so cool, what's its name?`, `aww, ${named}! give it a pat from me`]));
+  if (verb === "won") return reply(`you won?! congrats!! ${EMOJI.heart}`);
+  if (/^(made|built|finished|drew|painted|baked)$/.test(verb)) return reply(picker.pick("news.made", [`ooh, you ${verb} ${named}? that's so cool, i'm proud of you!`, `you ${verb} ${named}?! that's awesome!!`]));
+  return reply(picker.pick("news", [`ooh, ${named}! that's so cool`, `${named}?! nice!! tell me everything`]));
+}
 
 export const SOCIAL: Partial<Record<IntentId, Responder>> = {
   greet, farewell, thank, apologize, laugh, ack, agree, disagree,
   how_are_you: howAreYou, how_is_day: howIsDay, what_doing: whatDoing, ask_thinking: thinking,
-  ask_feeling: askFeeling, share_feeling: shareFeeling, distress, confused, statement, why,
+  ask_feeling: askFeeling, share_feeling: shareFeeling, distress, confused, statement, why, more, doubt, where_am_i: whereAmI,
+  ask_now: now,
 };

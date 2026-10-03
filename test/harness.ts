@@ -1,3 +1,4 @@
+import { CREW, type CrewMember } from "../src/config.ts";
 import { Grove } from "../src/brain/grove.ts";
 import { seeded } from "../src/brain/state/day.ts";
 import { InMemoryMemory } from "../src/brain/state/memory.ts";
@@ -44,6 +45,7 @@ export class Channel {
 
   userId(name: string): string {
     if (name === "grove") return GROVE_ID;
+    if (name in CREW) return CREW[name as CrewMember].id;
     let id = this.users.get(name);
     if (id === undefined) {
       id = `2${String(this.users.size + 1).padStart(17, "0")}`;

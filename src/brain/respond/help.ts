@@ -1,6 +1,7 @@
 import { LINKS } from "../../config.ts";
 import { downloadLine, MOD_FACTS, ORIGIN_BY_ID, ORIGINS, SERVER_FACTS } from "../content/knowledge.ts";
 import { SLANG_TERMS } from "../content/lexicon.ts";
+import { KNOWN_WORDS } from "../content/words.ts";
 import type { IntentId } from "../understand/intents.ts";
 import { findTopics, type Topics } from "../understand/topics.ts";
 import { channel, EMOJI, type Reply, type Responder, type Turn, safeWord } from "./turn.ts";
@@ -237,7 +238,6 @@ const versions: Responder = turn => {
   }
   let extra = "";
   if (/\bbedrock|pocket|mcpe\b/.test(text)) extra = " it's java edition only, sorry!";
-  else if (/\bforge\b/.test(text) && !/\bneoforge\b/.test(text)) extra = " no forge though, only neoforge!";
   else if (/\bquilt\b/.test(text)) extra = " quilt can usually run fabric mods, but only fabric is officially supported";
   return { text: `apoli and origins are on ${MOD_FACTS.loaders}.${extra}`, gloss: `the mods run on ${MOD_FACTS.loaders}`, act: "versions", topic: "versions" };
 };
@@ -330,6 +330,14 @@ const define: Responder = turn => {
   // question ("the capital of france") is general knowledge, and Grove says so.
   const safe = words.length <= 2 ? safeWord(term, 24) : null;
   if (safe === null) return null;
+  if (meaningful.length === 1 && KNOWN_WORDS.has(meaningful[0]!)) {
+    return {
+      text: picker.pick("def.common", [`${meaningful[0]}? i know the word, but i couldn't really explain it... i'm a slime!`, `hmm, ${meaningful[0]} is a big word for a little slime. maybe someone here can explain it better`]),
+      gloss: "i know the word but i can't explain it",
+      act: "define.common",
+      miss: true,
+    };
+  }
   const modish = turn.topics.set.size > 0;
   return {
     text: picker.pick("def.unknown", [`${safe}? i don't know what that is... i'm just a little slime.`, `hmm, i've never heard of ${safe}. is it bouncy?`])
@@ -362,6 +370,14 @@ const GLOSSARY: readonly GlossaryEntry[] = [
   { words: ["namespace"], text: "a namespace is the first part of an id, like the origins in origins:merling. your pack picks its own so it doesn't clash with others", gloss: "a namespace is the part of an id before the colon", topic: "datapack" },
   { words: ["resourcepack", "resourcepacks", "texturepack"], text: "a resource pack changes how things look and sound, like textures and models. !bars shows where resource bar sprites go", gloss: "a resource pack changes textures and sounds", topic: "datapack" },
   { words: ["mixin", "mixins"], text: `mixins are how java mods change minecraft's code. that's addon territory, ${channel("addonSupport")} knows way more than me`, gloss: "mixins let java mods change the game's code", topic: "addon" },
+  { words: ["love"], text: `love is when someone shares their moss with you for no reason ${EMOJI.heart}`, gloss: "love is being kind to someone", topic: null },
+  { words: ["life"], text: "life is mostly naps, moss, and talking to nice people. that's been my experience anyway", gloss: "life is about naps and nice people", topic: null },
+  { words: ["friend", "friends", "friendship"], text: "a friend is someone who says hi to you even when you're just a little slime", gloss: "friends are people who are kind to you", topic: null },
+  { words: ["moss"], text: "moss is the best thing in the whole world. soft, green, and it grows on me!", gloss: "moss is my favorite thing", topic: null },
+  { words: ["frog", "frogs"], text: "frogs are small green monsters that EAT SLIMES. stay away from them", gloss: "frogs eat slimes, so i'm scared of them", topic: null },
+  { words: ["rain"], text: "rain is the best weather! it makes me extra bouncy", gloss: "rain makes me happy", topic: null },
+  { words: ["tomorrow"], text: "tomorrow is the day after today! anything can happen, that's the fun part", gloss: "tomorrow is the next day", topic: null },
+  { words: ["yesterday"], text: "yesterday is the day before today. i barely remember it, slime memory", gloss: "yesterday was the day before", topic: null },
 ];
 
 function SELF_IDENTITY(turn: Turn): Reply {
@@ -369,12 +385,23 @@ function SELF_IDENTITY(turn: Turn): Reply {
 }
 
 // "how do I X?" and "where do I X?": work out what X is about and send them there.
-function task(turn: Turn): Reply | null {
+// `strict` is for messages that only mention a topic: then pack-making advice
+// needs a sign they want to make something, or "is your favorite thing the
+// orb of origins?" gets a datapack tutorial.
+function task(turn: Turn, strict = false): Reply | null {
   const text = turn.intent.slots["task"] ?? turn.reading.text;
   const topics = findTopics(text, text.split(" "));
   const has = (topic: string) => topics.set.has(topic as never);
 
   if (/\b(report|reporting)\b/.test(text) && (has("problem") || /\bbug|bugs\b/.test(text))) return sendTo(turn, "bug", true);
+  if (/\borb\b/.test(text) && !has("problem")) {
+    return {
+      text: `the orb of origin lets you pick your origin again! how you get one depends on how your world or server is set up. the handbook has the details: <${LINKS.handbook}>`,
+      gloss: "the orb of origin lets you re-pick your origin, and how you get one depends on the setup",
+      act: "define.orb",
+      topic: "origin",
+    };
+  }
   if (/\b(report|reporting)\b/.test(text) && /\b(user|player|person|someone|member)\b/.test(text)) return contactStaff(turn);
   if (has("suggestion") || /\b(suggest|idea|ideas)\b/.test(text)) return suggestion(turn);
   if (has("jam")) {
@@ -389,7 +416,8 @@ function task(turn: Turn): Reply | null {
   if (has("install")) return install(turn);
   if (has("addon")) return sendTo(turn, "addon");
   if (has("problem")) return sendTo(turn, placeFor(topics));
-  if (has("datapack") || has("json") || /\b(power|powers|origin|origins|layer|badge)\b/.test(text)) {
+  const making = /\b(make|making|create|creating|add|adding|write|writing|code|coding|start|starting|build|building|set ?up)\b/.test(text);
+  if ((!strict || making) && (has("datapack") || has("json") || /\b(power|powers|origin|origins|layer|badge)\b/.test(text))) {
     return {
       text: `${MOD_FACTS.datapackStart}. if you get stuck, ${channel("datapackSupport")} is full of helpful people!`,
       gloss: "the handbook shows how to make powers, and datapack support helps if you get stuck",
@@ -424,7 +452,7 @@ export const HELP: Partial<Record<IntentId, Responder>> = {
 // Messages about mod topics that did not match a frame still deserve a helpful answer.
 export function topicalFallback(turn: Turn): Reply | null {
   if (turn.topics.set.size === 0 && turn.topics.originId === null) return null;
-  const routed = task(turn);
+  const routed = task(turn, true);
   if (routed !== null) return routed;
   if (turn.topics.originId !== null) {
     const line = originLine(turn.topics.originId);

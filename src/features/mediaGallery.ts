@@ -1,7 +1,8 @@
 import { type Attachment, type Embed, type Message, MessageType } from "discord.js";
 import { CHANNELS } from "../config.ts";
-import { canManageMessages, isStaff } from "../discord/members.ts";
+import { canManageMessages } from "../discord/members.ts";
 import { logger } from "../logger.ts";
+import { MEDIA_RULES } from "../texts.ts";
 
 const log = logger("media-gallery");
 
@@ -10,7 +11,7 @@ const MEDIA_FILE = /\.(png|jpe?g|gif|webp|bmp|avif|heic|tiff?|mp4|mov|webm|mkv|a
 const REACTION_GIF_HOST = /(^|\.)(tenor\.com|giphy\.com)$/i;
 // Discord builds link previews a moment after the message arrives.
 const PREVIEW_WAIT_MS = 3_500;
-const NOTICE_LIFETIME_MS = 20_000;
+const NOTICE_LIFETIME_MS = 30_000;
 const NOTICE_COOLDOWN_MS = 2 * 60_000;
 
 export function attachmentIsMedia(attachment: Pick<Attachment, "contentType" | "name" | "url">): boolean {
@@ -36,7 +37,9 @@ function showsMedia(message: Message): boolean {
 
 // The media gallery is a no-talk zone: posts are screenshots and videos, and
 // conversations happen in threads on those posts. Text-only messages are
-// removed, the author gets a copy of what they wrote, and a short note explains why.
+// removed, the author gets a copy of what they wrote, and Grove posts the
+// !media rules (which clean themselves up). Moderators, meaning anyone who
+// can Manage Messages, are left alone so they can post notes.
 export class MediaGallery {
   private readonly lastNotice = new Map<string, number>();
 
@@ -44,7 +47,7 @@ export class MediaGallery {
     if (message.channelId !== CHANNELS.mediaGallery) return false;
     if (message.author.bot || message.webhookId !== null || message.system) return false;
     if (message.type !== MessageType.Default && message.type !== MessageType.Reply) return false;
-    if (isStaff(message.member) || canManageMessages(message.member)) return false;
+    if (canManageMessages(message.member)) return false;
     if (showsMedia(message)) return false;
 
     if (/https?:\/\//i.test(message.content)) {
@@ -57,12 +60,14 @@ export class MediaGallery {
     try {
       await message.delete();
     } catch (error) {
+      // Without Manage Messages Grove can still explain the rule, it just can't tidy up.
       log.warn("could not remove a text post from the media gallery (missing Manage Messages?)", error);
+      await this.explain(message, false, false);
       return false;
     }
 
     const saved = await this.sendCopy(message);
-    await this.explain(message, saved);
+    await this.explain(message, true, saved);
     return true;
   }
 
@@ -81,17 +86,18 @@ export class MediaGallery {
     }
   }
 
-  private async explain(message: Message, saved: boolean): Promise<void> {
+  private async explain(message: Message, removed: boolean, saved: boolean): Promise<void> {
     const now = Date.now();
     if (now - (this.lastNotice.get(message.author.id) ?? 0) < NOTICE_COOLDOWN_MS) return;
     this.lastNotice.set(message.author.id, now);
     if (!message.channel.isSendable()) return;
 
+    const lead = removed
+      ? `hey <@${message.author.id}>! i took your message out, this channel is only for pictures and videos${saved ? " (i sent you a copy in your dms)" : ""}`
+      : `hey <@${message.author.id}>! this channel is only for pictures and videos`;
     try {
       const notice = await message.channel.send({
-        content:
-          `hey <@${message.author.id}>! the media gallery is only for pictures and videos 📸 ` +
-          `if you want to talk about a post, start a thread on it 💬${saved ? " (i sent you a copy of your message)" : ""}`,
+        content: `${lead}\n\n${MEDIA_RULES}`,
         allowedMentions: { users: [message.author.id] },
       });
       setTimeout(() => {

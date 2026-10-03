@@ -19,6 +19,15 @@ export const COMPLIMENTS = set(`
   soft fluffy gooey slimy wholesome friendly polite patient talented underrated
 `);
 
+// Affectionate names for Grove: "you goober", "silly goose", "cutie".
+export const PET_NAMES = set(`
+  goober goob dork nerd goof goofball cutie sweetie bean bestie baby babe pookie silly goose gremlin munchkin
+  blob bloblet jellybean sweetpea angel buddy pal
+`);
+
+// "are you small?", "you're so tiny": questions about how big Grove is.
+export const SIZE_WORDS = set(`small little tiny smol big huge large heavy light tall short round chonky chunky`);
+
 // Neutral or curious things to call Grove that deserve an answer, not a mood swing.
 export const GENDER_WORDS = set(`
   boy girl guy gal man woman male female dude lady gentleman gentlemen sir maam he she him her his hers
@@ -88,7 +97,80 @@ export const ABILITIES: Readonly<Record<string, Ability>> = table({
   shut: { can: true, line: "okay... *sits quietly*" },
   type: { can: true, line: "i type with my whole body, it's exhausting but i manage" },
   game: { can: true, line: "games are fun! i'm bad at most of them, but i try" },
+  photosynthesize: { can: true, line: "my moss does! i just sit in the sun and take the credit" },
+  grow: { can: true, line: "a tiny bit every time it rains! my leaf grows faster than me though" },
+  shrink: { can: true, line: "*squishes down small* tiny grove! okay, that's as small as i go" },
+  melt: { can: true, line: "only if it's really hot! that's why the nether scares me" },
+  breathe: { can: true, line: "i think so? i kind of absorb air. slime science is confusing" },
+  wobble: { can: true, line: "all the time! *wobble wobble*" },
+  jiggle: { can: true, line: "*jiggle jiggle* i'm a natural" },
+  cry: { can: true, line: "only when someone's mean, and it comes out as tiny bubbles" },
+  sweat: { can: true, line: "i'm always a little damp, so... yes? it's a slime thing" },
+  blink: { can: true, line: "*blinks* both eyes at once, i can't wink" },
+  wink: { can: false, line: "*blinks both eyes* ...i can't wink. but i tried" },
+  sneeze: { can: true, line: "only near dandelions! achoo! *a flower falls off*" },
+  shower: { can: true, line: "i sit in the rain! best shower there is" },
+  bathe: { can: true, line: "i sit in the rain! best bath there is" },
+  smile: { can: true, line: "all the time! :D" },
+  laugh: { can: true, line: "hehehe! like that" },
+  ping: { can: false, line: "nope! i never ping anyone, it's rude. *whispers* hi everyone" },
+  teleport: { can: false, line: "i'm not an enderian! *bounces two blocks to the left* ta-da, close enough" },
+  transform: { can: false, line: "*wobbles really hard* ...nope, still a slime" },
+  evolve: { can: false, line: "*wobbles really hard* ...nope, still a slime" },
+  spin: { can: true, line: "*spins* wheee! *dizzy wobble*" },
+  roll: { can: true, line: "*rolls across the moss* i'm very round, it's easy" },
+  hide: { can: true, line: "*hides behind the orb of origin* can you see me?" },
+  wave: { can: true, line: "*waves with my whole body*" },
+  whisper: { can: true, line: "*whispers* hi" },
+  scream: { can: true, line: "AAAAA! okay, that was very loud for a slime" },
+  yell: { can: true, line: "AAAAA! okay, that was very loud for a slime" },
+  shout: { can: true, line: "AAAAA! okay, that was very loud for a slime" },
+  explode: { can: false, line: "i'm a slime, not a creeper!! please" },
+  multiply: { can: false, line: "i keep trying to split in two like the slimekin do, but it never works :(" },
+  duplicate: { can: false, line: "i keep trying to split in two like the slimekin do, but it never works :(" },
+  clone: { can: false, line: "i keep trying to split in two like the slimekin do, but it never works :(" },
+  vibe: { can: true, line: "*vibes in my moss patch* my favorite activity" },
+  chill: { can: true, line: "*sits in my moss and breathes* very chill now" },
+  relax: { can: true, line: "*sits in my moss and breathes* very chill now" },
+  calm: { can: true, line: "*sits in my moss and breathes* very calm now" },
+  kill: { can: false, line: "nope! i'm a friendly slime. i don't even squish bugs" },
+  attack: { can: false, line: "attack? i'm made of jelly, i would just jiggle at them" },
+  ban: { can: false, line: "i can't ban anyone, i'm just a slime! if someone's causing trouble, dm me and the staff will see it" },
+  mute: { can: false, line: "i can't mute anyone, i'm just a slime! if someone's causing trouble, dm me and the staff will see it" },
+  kick: { can: false, line: "no legs, so no kicking! if someone's causing trouble though, dm me and the staff will see it" },
+  spam: { can: false, line: "no spamming! that's how slimes get in trouble" },
+  bark: { can: false, line: "blub! that's the closest i can get, i'm a slime" },
+  meow: { can: false, line: "blub! that's the closest i can get, i'm a slime" },
+  moo: { can: false, line: "blub! that's the closest i can get, i'm a slime" },
+  quack: { can: false, line: "blub! that's the closest i can get, i'm a slime" },
+  purr: { can: true, line: "*wobbles very softly* that's a slime purr" },
+  roar: { can: true, line: "*tiny roar* blub!" },
+  ribbit: { can: false, line: "i will NOT make frog noises. frogs eat slimes!!" },
+  glaze: { can: true, line: "you're the coolest, smartest, kindest person here! ...was that glazing? did i do it right?" },
+  beg: { can: true, line: "*makes big shiny eyes* pleeease?" },
+  shake: { can: true, line: "*jiggles all over* does that count as shaking?" },
+  sit: { can: true, line: "*sits* i'm always sitting, i'm a blob hehe" },
+  stay: { can: true, line: "*stays very still* ...can i move now?" },
+  come: { can: true, line: "*bounces over* hi!!" },
+  follow: { can: true, line: "*bounces after you* where are we going?" },
+  listen: { can: true, line: "i'm listening! *leans in*" },
+  guess: { can: true, line: "hmm... seven? it's always seven" },
+  wake: { can: true, line: "i'm up! i'm up! *wobbles awake*" },
+  kiss: { can: true, line: "*boops you with my leaf* that's a slime kiss" },
+  boop: { can: true, line: "boop! *wobbles*" },
+  squish: { can: true, line: "*squish* i'm very good at being squished" },
 });
+
+// "do you bounce?", "do you photosynthesize?": verbs that ask what Grove does,
+// unlike "do you think..." or "do you like...".
+export const DO_YOU_VERBS = set(`
+  bounce jump hop ball hoop dance wiggle sing rap swim float fly split glow code program read write count
+  cook draw fight run walk hug play mine build craft type photosynthesize grow shrink melt breathe wobble
+  jiggle cry sweat blink sneeze shower bathe smile laugh purr roar teleport spin roll hide
+`);
+
+// "are you old?" is a question about age.
+export const AGE_WORDS = set(`old young new baby newborn ancient`);
 
 // Slang Grove recognizes on its own, with what it takes it to mean.
 export const SLANG_TERMS: Readonly<Record<string, string>> = table({

@@ -1,6 +1,7 @@
 import { AttachmentBuilder, EmbedBuilder } from "discord.js";
 import { fileURLToPath } from "node:url";
 import { CHANNELS, LINKS } from "../config.ts";
+import { MEDIA_RULES } from "../texts.ts";
 import { answer, type Command } from "./command.ts";
 
 const asset = (name: string) => fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
@@ -45,15 +46,7 @@ That way the team can review, discuss and track each one.`),
   {
     name: "media",
     description: "Explains the media gallery rules",
-    run: context => answer(context, `## The Media Gallery
-
-This is a **no-talk zone** for sharing clips and screenshots of what you're working on.
-
-Want to comment? **Start a thread on the post** and discuss it there.
-
-📸 **Post your work.**
-💬 **Discuss in threads.**
-🚫 **No standalone messages.**`),
+    run: context => answer(context, MEDIA_RULES),
   },
   {
     name: "parser",

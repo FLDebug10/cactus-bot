@@ -1,9 +1,12 @@
 import { CHANNELS, type ChannelKey, EMOJI } from "../../config.ts";
-import type { Intent } from "../understand/intents.ts";
+import { ORIGIN_BY_ID } from "../content/knowledge.ts";
+import { DISLIKES, LIKES } from "../content/lexicon.ts";
+import { CORRECTION_TARGETS } from "../content/words.ts";
+import type { Intent, IntentId, Slots } from "../understand/intents.ts";
 import type { Topics } from "../understand/topics.ts";
 import type { Addressing } from "../understand/addressing.ts";
 import type { Reading } from "../text/reader.ts";
-import type { DayProfile } from "../state/day.ts";
+import type { Calendar, DayProfile } from "../state/day.ts";
 import type { MoodEvent, MoodSnapshot } from "../state/mood.ts";
 import type { Friend } from "../state/memory.ts";
 import type { GroveLine, SeenMessage, Session } from "../state/conversation.ts";
@@ -16,6 +19,10 @@ export interface Turn {
   reading: Reading;
   intent: Intent;
   intents: readonly Intent[];
+  // A compliment, thanks or "love you" that came with the question, answered first in a few words.
+  lead: Intent | null;
+  // A second question in the same message, answered after the first.
+  also: Intent | null;
   topics: Topics;
   sentiment: number;
   greeted: boolean;
@@ -26,7 +33,11 @@ export interface Turn {
   session: Session;
   mood: MoodSnapshot;
   day: DayProfile;
+  // Grove's day `offset` days from today: 1 is tomorrow, -1 yesterday.
+  dayAt(offset: number): DayProfile;
   hour: number;
+  // Today's date where Grove lives.
+  calendar: Calendar;
   now: number;
   picker: Picker;
   // The message this one replies to, and the Grove line it is, if it is one.
@@ -37,6 +48,8 @@ export interface Turn {
   // Grove's most recent line in this channel, to anyone.
   lastLineHere: GroveLine | null;
   expectation: Expectation | null;
+  // The people Grove likes most, warmest first.
+  topFriends(limit: number): Friend[];
 }
 
 export interface Reply {
@@ -46,6 +59,10 @@ export interface Reply {
   act?: string;
   topic?: string | null;
   reactions?: readonly string[];
+  // Images from assets/ to attach, by file name.
+  files?: readonly string[];
+  // What this answered, when it differs from the message's own intent (a follow-up that got resolved).
+  about?: { intent: IntentId; slots: Slots; question: string };
   feel?: MoodEvent;
   expect?: Expectation | null;
   // React only, say nothing.
@@ -58,6 +75,13 @@ export interface Reply {
 }
 
 export type Responder = (turn: Turn) => Reply | null;
+
+// "tomorrow" -> 1, "yesterday" or "last night" -> -1, anything else -> today.
+export function dayOffsetIn(text: string): number {
+  if (/\btomorrow\b/.test(text)) return 1;
+  if (/\byesterday\b|\blast night\b/.test(text)) return -1;
+  return 0;
+}
 
 export function channel(key: ChannelKey): string {
   return `<#${CHANNELS[key]}>`;
@@ -104,11 +128,13 @@ const STOPWORDS = new Set(`
   dont should now grove someone thing things stuff lot lots kind sort bit get got make made go going went
 `.trim().split(/\s+/));
 
-// A plain, safe noun-ish word from the clause, for curious little echoes.
+// A plain, safe noun-ish word from the clause, for curious little echoes. Never
+// a word Grove already knows about: asking "what's slimekin?" would be silly.
 export function curiousWord(tokens: readonly string[]): string | null {
   let best: string | null = null;
   for (const token of tokens) {
     if (STOPWORDS.has(token) || token.length < 4 || token.length > 12) continue;
+    if (CORRECTION_TARGETS.has(token) || LIKES.has(token) || DISLIKES.has(token) || ORIGIN_BY_ID.has(token)) continue;
     const safe = safeWord(token, 12);
     if (safe !== null && (best === null || safe.length > best.length)) best = safe;
   }

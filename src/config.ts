@@ -43,6 +43,15 @@ export const STAFF_ROLE_IDS: readonly string[] = [
   "1547961618980274226",
 ];
 
+// The people who made Grove. It recognizes them, and credits them when asked.
+export const CREW = {
+  drizzo: { id: "545113206646112286", username: "_drizzo_" },
+  fld10: { id: "967451640581996594", username: "_fld10_" },
+  overgrown: { id: "900379751653445673", username: "0vergrown" },
+} as const;
+
+export type CrewMember = keyof typeof CREW;
+
 export const EMOJI = {
   grove: "<:grove:1554976275729223740>",
   orb: "<:grove_orb:1555207821291683950>",
