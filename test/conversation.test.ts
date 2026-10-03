@@ -377,10 +377,109 @@ describe("silly questions", () => {
   it("answers questions typed without a question mark, and guesses at yes or no ones", () => {
     const channel = new Channel();
     assert.equal(channel.say("max", "grove what do you taste like").act, "ask_body");
-    assert.equal(channel.say("max", "grove is water wet?", { gapMs: 60_000 }).act, "question.guess");
+    assert.equal(channel.say("max", "grove is lava hot?", { gapMs: 60_000 }).act, "question.guess");
+    assert.equal(channel.say("max", "grove is water wet?", { gapMs: 60_000 }).act, "dumb_question");
     assert.match(channel.say("max", "grove are you better than carl bot", { gapMs: 60_000 }).text ?? "", /carl-bot/);
     assert.equal(channel.say("max", "grove you're my favorite", { gapMs: 60_000 }).act, "love");
     assert.match(channel.say("max", "grove i got a new dog", { gapMs: 60_000 }).text ?? "", /dog/);
+  });
+});
+
+describe("fourth round of feedback", () => {
+  it("gets excited about fans and their posters", () => {
+    const reply = new Channel().say("kit", "grove im your biggest fan im going to put posters of you all over the streets of england");
+    assert.equal(reply.act, "fan");
+    assert.match(reply.text ?? "", /posters/);
+    assert.match(reply.text ?? "", /england/);
+    assertGroveVoice(reply.text);
+    const channel = new Channel();
+    assert.match(channel.say("kit", "grove can i have your autograph").text ?? "", /splat|signs/);
+    assert.equal(channel.say("kit", "grove i'm a big fan of slimekin", { gapMs: 60_000 }).act, "fan_of");
+  });
+
+  it("can't do homework, but cheers and helps with the math", () => {
+    const channel = new Channel();
+    const asked = channel.say("kit", "grove can do my homework");
+    assert.equal(asked.act, "homework");
+    assert.match(asked.text ?? "", /homework|hands|sticky/);
+    const help = channel.say("kit", "grove can you help me with my homework", { gapMs: 60_000 });
+    assert.equal(help.decision?.meta.expectation?.kind, "homework_subject");
+    const subject = channel.say("kit", "its math", { gapMs: 10_000 });
+    assert.match(subject.text ?? "", /math|problem/);
+    assert.equal(channel.say("kit", "grove whats 12 times 12", { gapMs: 10_000 }).text?.includes("144"), true);
+  });
+
+  it("does the math it was asked, in words or symbols", () => {
+    const channel = new Channel();
+    assert.match(channel.say("kit", "grove whats 24 divided by 5").text ?? "", /4\.8/);
+    assert.match(channel.say("kit", "grove what is 20 time 30", { gapMs: 60_000 }).text ?? "", /600/);
+    assert.match(channel.say("kit", "whats 50*(12+8) grove", { gapMs: 60_000 }).text ?? "", /1000/);
+    assert.match(channel.say("kit", "grove solve 2x + 3 = 7", { gapMs: 60_000 }).text ?? "", /x (=|is) 2/);
+    assert.match(channel.say("kit", "grove is 7 x 8 54?", { gapMs: 60_000 }).text ?? "", /56/);
+    assert.equal(channel.say("kit", "grove i rate it 10/10", { gapMs: 60_000 }).act === "math", false);
+  });
+
+  it("explains dumb questions and answers them dumbly", () => {
+    const channel = new Channel();
+    const explained = channel.say("kit", "grove what are dumb questions");
+    assert.equal(explained.act, "dumb_question");
+    assert.match(explained.text ?? "", /\?/);
+    const microwave = channel.say("kit", "grove Why is there a zero button on the microwave? I mean, who is heating their food for zero seconds?", { gapMs: 60_000 });
+    assert.equal(microwave.act, "dumb_question");
+    assert.match(microwave.text ?? "", /slime|beep/);
+    assert.equal(channel.say("kit", "grove is a hot dog a sandwich?", { gapMs: 60_000 }).act, "dumb_question");
+    const mine = channel.say("kit", "grove ask me a dumb question", { gapMs: 60_000 });
+    assert.equal(mine.decision?.meta.expectation?.kind, "dumb_answer");
+    assert.equal(channel.say("kit", "obviously the puddle is taking a slime", { gapMs: 10_000 }).act, "dumb_question");
+    const worried = channel.say("kit", "grove sorry if this is a dumb question but how do i install origins", { gapMs: 60_000 });
+    assert.equal(worried.act, "install");
+    assert.match(worried.text ?? "", /dumb/);
+  });
+
+  it("answers what commands it has with the !help list", () => {
+    const reply = new Channel().say("kit", "grove can u tell me some commands you have?");
+    assert.equal(reply.act, "commands");
+    assert.equal(reply.decision?.command, "help");
+    assert.equal(new Channel().say("kit", "grove how do i use the /power command").decision?.command ?? null, null);
+  });
+
+  it("knows its d&d, where slimes are oozes", () => {
+    const channel = new Channel();
+    const favorite = channel.say("kit", "grove what's your favourite D&D class?");
+    assert.equal(favorite.act, "fantasy.favorite");
+    assert.match(favorite.text ?? "", /druid/);
+    assert.match(channel.say("kit", "grove are there slimes in dnd", { gapMs: 60_000 }).text ?? "", /ooze/);
+    assert.match(channel.say("kit", "grove can a druid wild shape into a slime", { gapMs: 60_000 }).text ?? "", /beasts/);
+    assert.match(channel.say("kit", "grove what is a gelatinous cube", { gapMs: 60_000 }).text ?? "", /cube/);
+    assert.match(channel.say("kit", "grove roll 2d6", { gapMs: 60_000 }).text ?? "", /2d6/);
+    assert.equal(channel.say("kit", "grove i'm on dnd rn", { gapMs: 60_000 }).act === "fantasy", false);
+  });
+
+  it("keeps politics out, with oranges", () => {
+    const trump = new Channel().say("kit", "Grove, what is your opinion of US president Donald Trump?");
+    assert.equal(trump.act, "politics");
+    assert.match(trump.text ?? "", /orange/);
+    assert.doesNotMatch(trump.text ?? "", /trump|president/i);
+    const vote = new Channel().say("kit", "grove who should i vote for");
+    assert.equal(vote.act, "politics");
+    assert.doesNotMatch(vote.text ?? "", /orange/);
+  });
+
+  it("plays along with slang the way it was used", () => {
+    const channel = new Channel();
+    assert.match(channel.say("kit", "grove are you mewing").text ?? "", /jaw|shh/);
+    assert.match(channel.say("kit", "grove do you mew", { gapMs: 60_000 }).text ?? "", /jaw|shh/);
+    assert.match(channel.say("kit", "Grove can you hit the griddy for me", { gapMs: 60_000 }).text ?? "", /griddy/);
+    assert.match(channel.say("kit", "grove do you mog", { gapMs: 60_000 }).text ?? "", /mog/);
+    assert.match(channel.say("kit", "grove what does rizz mean", { gapMs: 60_000 }).text ?? "", /charm/);
+    assert.match(channel.say("kit", "grove what does gyatt mean", { gapMs: 60_000 }).text ?? "", /shouldn't ask|pretend/);
+    assert.deepEqual(new Channel().say("kit", "grove has so much rizz").decision?.reactions, [EMOJI.heart]);
+  });
+
+  it("stays out of it when nobody is talking to it", () => {
+    for (const text of ["im your biggest fan", "whats 24 divided by 5", "who should i vote for", "can you do my homework", "are you mewing", "whats your favourite dnd class"]) {
+      assert.equal(new Channel().say("kit", text).decision, null, text);
+    }
   });
 });
 
@@ -405,6 +504,9 @@ describe("grove's voice", () => {
       "grove roll a d20", "grove flip a coin", "grove pick pizza or tacos", "*pets grove*", "grove good night",
       "grove do you have pockets", "grove what time is it", "grove who is drizzo", "grove give me the orb", "grove say something",
       "grove a frog is behind you", "grove when is your birthday", "grove what do you look like", "grove fight me",
+      "grove im your biggest fan", "grove do my homework", "grove whats 24 divided by 5", "grove what are dumb questions",
+      "grove what's your favourite dnd class", "grove what do you think of trump", "grove are you mewing", "grove hit the griddy",
+      "grove do you mog", "grove what is a nat 20", "grove is cereal soup?", "grove roll for initiative",
     ];
     for (let seed = 1; seed <= 12; seed++) {
       const channel = new Channel({ seed });

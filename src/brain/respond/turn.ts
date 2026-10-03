@@ -61,6 +61,8 @@ export interface Reply {
   reactions?: readonly string[];
   // Images from assets/ to attach, by file name.
   files?: readonly string[];
+  // Send this !command's output instead of the text, like the !help list.
+  command?: string;
   // What this answered, when it differs from the message's own intent (a follow-up that got resolved).
   about?: { intent: IntentId; slots: Slots; question: string };
   feel?: MoodEvent;

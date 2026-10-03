@@ -2,7 +2,7 @@ import "dotenv/config";
 import { ActivityType, ChannelType, Events, type Message } from "discord.js";
 import { Grove } from "./brain/grove.ts";
 import type { ChatMessage } from "./brain/types.ts";
-import { runCommand } from "./commands/registry.ts";
+import { helpText, runCommand } from "./commands/registry.ts";
 import { deploySlashCommands, handleInteraction } from "./commands/slash.ts";
 import type { Services } from "./commands/command.ts";
 import { CHANNELS, SETTINGS } from "./config.ts";
@@ -51,7 +51,7 @@ const services: Services = {
   modmail: new Modmail(client, modmailLinks),
   grove,
 };
-const chat = new GroveChat(grove, client);
+const chat = new GroveChat(grove, client, name => (name === "help" ? helpText(services) : null));
 const gallery = new MediaGallery();
 
 client.once(Events.ClientReady, async ready => {

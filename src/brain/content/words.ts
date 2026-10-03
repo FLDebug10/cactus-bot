@@ -183,7 +183,20 @@ export const KNOWN_WORDS = new Set(words(`
   bot bots robot ai human alive real chatgpt
   lol lmao bruh bro dude fr ngl tbh idk omg rizz sigma skibidi ohio gyatt mewing cap bussin sus
   slay based mid goated drip vibe vibes vibing yeet cringe simp stan ratio poggers pog bet ate
-  sheesh delulu bestie
+  sheesh delulu bestie mog mogs mogged mogging mogger mew mews mewed griddy looksmax looksmaxxing looksmaxing
+  rizzler rizzing gyat goon gooning huzz capping slayed ratioed sussy npcs aura yeeted glazing glazer yap yapping
+  yapper unc tweaking tweakin opp opps cooked cooking demure brainrot fanum amogus tralalero tralala bombardiro
+  crocodilo sahur patapim
+  dnd druid druids paladin paladins warlock warlocks sorcerer sorcerers artificer artificers cleric clerics bard
+  bards barbarian barbarians fighter fighters monk monks ranger rangers rogue rogues wizard wizards tiefling
+  tieflings dragonborn aasimar tabaxi kenku plasmoid plasmoids warforged firbolg tortle aarakocra harengon genasi
+  halfling halflings gnome gnomes dwarf dwarves elf elves orc orcs goblin goblins kobold kobolds owlbear beholder
+  illithid tarrasque gelatinous ochre pudding ooze oozes mimic mimics lich cantrip cantrips initiative multiclass
+  homebrew tpk rimuru tensura rancher plort plorts terraria
+  homework assignment assignments worksheet essay essays algebra geometry calculus chemistry physics biology
+  geography spanish french german trump biden politics political election president fans fanart autograph
+  poster posters statue shrine tattoo merch plushie selfie microwave sandwich cereal soup waiter driveway
+  parkway vacuum ketchup smoothie abbreviation straw squared cubed plus minus times divided multiplied percent
 `));
 
 // Words worth fixing typos toward: the ones whole intents and routes hinge on.
@@ -204,5 +217,5 @@ export const CORRECTION_TARGETS = new Set(words(`
   annoying terrible horrible awful boring weird creepy ugly disgusting trash garbage worthless pathetic
   merling enderian arachnid avian blazeborn buzzborne elytrian feline human phantom shulk slimekin
   slime frog frogs basketball favourite birthday sentient conscious robot artificial program
-  jam jams entry entries contest species subspecies pocket pockets leafy sprout
+  jam jams entry entries contest species subspecies pocket pockets leafy sprout homework
 `));

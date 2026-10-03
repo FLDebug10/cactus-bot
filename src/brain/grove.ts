@@ -7,6 +7,7 @@ import { Conversations, type SeenMessage, type Session } from "./state/conversat
 import { calendarIn, dayKey, dayProfile, hourIn } from "./state/day.ts";
 import { type Friend, type Memory, newFriend } from "./state/memory.ts";
 import { Mood } from "./state/mood.ts";
+import { FANTASY } from "./respond/fantasy.ts";
 import { FUN } from "./respond/fun.ts";
 import { answerHelpTopic, answerProblemSource, HELP, topicalFallback } from "./respond/help.ts";
 import { Picker } from "./respond/picker.ts";
@@ -30,7 +31,7 @@ export interface GroveOptions {
   isSupportChannel?: (message: ChatMessage) => boolean;
 }
 
-const RESPONDERS: Partial<Record<IntentId, Responder>> = { ...SOCIAL, ...SELF, ...HELP, ...FUN };
+const RESPONDERS: Partial<Record<IntentId, Responder>> = { ...SOCIAL, ...SELF, ...HELP, ...FUN, ...FANTASY };
 
 // Intents worth answering when nobody addressed Grove at all, after a pause
 // in which no person answered first.
@@ -48,6 +49,7 @@ const CONTINUATION_OK = new Set<IntentId>([
   "where_to", "distress", "laugh", "share_feeling", "claim_about_grove", "why", "channels", "compat",
   "bomb", "follow_up", "favorite_person", "more", "doubt", "where_am_i", "ask_origin_story", "ask_body", "ask_size",
   "can_i_you", "hypothetical", "favorite_guess", "ask_have", "ask_fear", "frog_alert", "give", "ask_now", "ask_crew", "self_how",
+  "politics", "fan", "homework", "dumb_question", "fantasy", "slang",
 ]);
 
 // Reactions that, right under one of Grove's messages, are about that message.
@@ -66,6 +68,10 @@ const ABOUT_GROVE_QUESTIONS = new Set<IntentId>([
   "ask_is_bot", "ask_alive", "ask_gender", "ask_identity", "ask_species", "ask_age", "ask_name", "ask_creator", "claim_about_grove",
   "ask_fear", "ask_body", "ask_size", "ask_origin_story", "ask_have",
 ]);
+
+// "grove is a hot dog a sandwich?" reads like a remark about Grove, but these
+// can only be questions put to it.
+const ALWAYS_TO_GROVE = new Set<IntentId>(["dumb_question", "politics", "math"]);
 
 const FRAGMENT_WINDOW = 8_000;
 const UNANSWERED_WAIT = 45_000;
@@ -151,7 +157,7 @@ export class Grove {
     const topics = findTopics(reading.text, reading.tokens);
     const { intents, greeted } = interpret(reading, topics);
     const repliesToGrove = replyToAuthorId !== null && replyToAuthorId === this.groveId;
-    const addressing = addressingOf({
+    let addressing = addressingOf({
       reading,
       mentionsGrove,
       repliesToGrove,
@@ -163,6 +169,7 @@ export class Grove {
     const plan = planFor(intents);
     if (plan === null) return null;
     const primary = plan.primary;
+    if (addressing === "about" && ALWAYS_TO_GROVE.has(primary.id) && reading.names[0]?.index === 0) addressing = "vocative";
 
     const session = this.conversations.session(message.channelId, message.authorId);
 
@@ -257,9 +264,12 @@ export class Grove {
   private overheard(message: ChatMessage, plan: Plan, intents: readonly Intent[], topics: Topics, reading: Reading, now: number, session: Session, greeted: boolean): Decision | null {
     const last = this.lastAboutReaction.get(message.channelId) ?? 0;
     if (now - last < 2 * 60_000) return null;
-    const kind = (plan.lead ?? plan.primary).id;
+    const said = plan.lead ?? plan.primary;
+    const kind = said.id;
+    // "grove has so much rizz" is praise too.
+    const praisingSlang = kind === "slang" && said.slots["tone"] === "praise" && said.slots["use"] === "you";
 
-    if (kind === "compliment" || kind === "love") {
+    if (kind === "compliment" || kind === "love" || kind === "fan" || praisingSlang) {
       this.lastAboutReaction.set(message.channelId, now);
       this.mood.feel(kind === "love" ? "love" : "compliment", message.authorName, now);
       return reactionOnly(message, [EMOJI.heart], "overheard.kind");
@@ -366,7 +376,7 @@ export class Grove {
   // "what's the leafy part on your head? are you a sub-species?": answer both.
   private withSecondAnswer(turn: Turn, reply: Reply): Reply {
     const second = turn.also;
-    if (second === null || reply.silent === true) return reply;
+    if (second === null || reply.silent === true || reply.command !== undefined) return reply;
     const extra = RESPONDERS[second.id]?.({ ...turn, intent: second, also: null }) ?? null;
     if (extra === null || extra.silent === true || extra.text.length === 0 || extra.act === reply.act) return reply;
     const first = /[.!?)*]$/.test(reply.text.trim()) ? reply.text.trim() : `${reply.text.trim()}.`;
@@ -427,6 +437,8 @@ export class Grove {
         return "hehe ";
       case "greet":
         return this.picker.pick("lead.greet", [`hi ${turn.name}! `, "hii! "]);
+      case "dumb_question":
+        return this.picker.pick("lead.dumb", ["no such thing as a dumb question! ", "not dumb at all! "]);
       default:
         return "";
     }
@@ -483,6 +495,7 @@ export class Grove {
       text,
       reactions,
       files: silent ? [] : [...(reply.files ?? [])],
+      command: silent ? null : reply.command ?? null,
       delayMs,
       waitForSilenceMs,
       meta: {
@@ -528,7 +541,10 @@ function planFor(intents: readonly Intent[]): Plan | null {
       lead = best;
     }
   }
-  const also = pickPrimary(intents.filter(intent => intent.clause !== primary.clause && intent.id !== primary.id && !NOT_A_SECOND_ANSWER.has(intent.id)));
+  // "sorry if this is a dumb question, but...": a reassurance, then the answer.
+  const worried = intents.find(intent => intent.id === "dumb_question" && intent.slots["kind"] === "remark" && intent.clause !== primary.clause);
+  if (lead === null && worried !== undefined) lead = worried;
+  const also = pickPrimary(intents.filter(intent => intent !== lead && intent.clause !== primary.clause && intent.id !== primary.id && !NOT_A_SECOND_ANSWER.has(intent.id)));
   return { primary, lead, also };
 }
 
@@ -556,6 +572,7 @@ function reactionOnly(message: ChatMessage, reactions: readonly string[], act: s
     text: null,
     reactions,
     files: [],
+    command: null,
     delayMs: 400,
     waitForSilenceMs: 0,
     meta: { covers: [message.id], act, intent: act, slots: {}, question: "", topic: null, channelId: message.channelId, toUserId: message.authorId, toUserName: message.authorName, gloss: null, expectation: null },

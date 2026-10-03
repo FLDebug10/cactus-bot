@@ -1,4 +1,5 @@
 import { ORIGINS } from "../content/knowledge.ts";
+import { SLANG_BY_ID } from "../content/slang.ts";
 import { table } from "../content/table.ts";
 
 export type Topic =
@@ -65,11 +66,16 @@ export interface Topics {
   owner: "own" | "mod" | null;
 }
 
+// "i'm crashing out" is a person losing their cool, not a game crash.
+const CRASH_OUT = SLANG_BY_ID.get("crash out")!.match;
+
 export function findTopics(text: string, tokens: readonly string[]): Topics {
   const set = new Set<Topic>();
   let originId: string | null = null;
+  const crashingOut = CRASH_OUT.test(text);
 
   for (const token of tokens) {
+    if (crashingOut && /^crash/.test(token)) continue;
     const topics = TOPIC_WORDS[token];
     if (topics !== undefined) for (const topic of topics) set.add(topic);
     if (originId === null && ORIGIN_NAMES.has(token)) {

@@ -155,10 +155,70 @@ describe("intents for the messages Grove used to get wrong", () => {
     ["do you have a job", "ask_identity"],
     ["who controls you", "ask_is_bot"],
     ["are you better than carl bot", "ask_attribute"],
+    ["grove im your biggest fan im going to put posters of you all over the streets of england", "fan"],
+    ["can i have your autograph", "fan"],
+    ["grove can do my homework", "homework"],
+    ["can you help me with my math homework", "homework"],
+    ["i have a test tomorrow", "homework"],
+    ["grove whats 24 divided by 5", "math"],
+    ["grove what is 20 time 30", "math"],
+    ["what are dumb questions", "dumb_question"],
+    ["why is there a zero button on the microwave?", "dumb_question"],
+    ["can u tell me some commands you have?", "commands"],
+    ["do you have any commands", "commands"],
+    ["what's your favourite D&D class?", "fantasy"],
+    ["do you play dungeons and dragons", "fantasy"],
+    ["are there slimes in other games", "fantasy"],
+    ["Grove, what is your opinion of US president Donald Trump?", "politics"],
+    ["who should i vote for", "politics"],
+    ["grove are you mewing", "slang"],
+    ["grove do you mew", "slang"],
+    ["Grove can you hit the griddy for me", "slang"],
+    ["grove do you mog", "slang"],
+    ["what does rizz mean", "slang"],
+    ["i'm crashing out", "slang"],
   ];
   for (const [text, expected] of cases) {
     it(`${JSON.stringify(text)} reads as ${expected}`, () => assert.equal(intentOf(text), expected));
   }
+});
+
+describe("slang in context", () => {
+  function slangOf(text: string): { term: string; use: string } {
+    const reading = read(text, GROVE_ID);
+    const { intents } = interpret(reading, findTopics(reading.text, reading.tokens));
+    const slang = intents.find(intent => intent.id === "slang");
+    assert.ok(slang !== undefined, `no slang in ${JSON.stringify(text)}`);
+    return { term: slang.slots["term"] ?? "", use: slang.slots["use"] ?? "" };
+  }
+
+  it("knows whether it was asked, told, described, or asked for a meaning", () => {
+    assert.deepEqual(slangOf("grove are you mewing"), { term: "mewing", use: "ask" });
+    assert.deepEqual(slangOf("grove do you mew"), { term: "mewing", use: "ask" });
+    assert.deepEqual(slangOf("grove mew for me"), { term: "mewing", use: "perform" });
+    assert.deepEqual(slangOf("grove can you hit the griddy for me"), { term: "griddy", use: "perform" });
+    assert.deepEqual(slangOf("grove you mog"), { term: "mog", use: "you" });
+    assert.deepEqual(slangOf("i mog everyone"), { term: "mog", use: "me" });
+    assert.deepEqual(slangOf("what does mog mean"), { term: "mog", use: "define" });
+    assert.deepEqual(slangOf("grove what is your aura"), { term: "aura", use: "ask" });
+    assert.deepEqual(slangOf("we're cooked"), { term: "cooked", use: "me" });
+    assert.deepEqual(slangOf("you cooked with that one"), { term: "let him cook", use: "you" });
+  });
+
+  it("leaves ordinary words alone", () => {
+    for (const text of ["i lost my cap", "it's giving me errors", "i ate a glazed donut", "my elytra broke mid flight", "it's based on apace's mod", "opps sorry", "my game is crashing out of nowhere"]) {
+      const reading = read(text, GROVE_ID);
+      const { intents } = interpret(reading, findTopics(reading.text, reading.tokens));
+      assert.equal(intents.some(intent => intent.id === "slang"), false, text);
+    }
+  });
+
+  it("keeps a game crash a crash, and a person crashing out a person", () => {
+    const game = read("my game is crashing out of nowhere", null);
+    assert.equal(findTopics(game.text, game.tokens).set.has("problem"), true);
+    const person = read("i'm crashing out", null);
+    assert.equal(findTopics(person.text, person.tokens).set.has("problem"), false);
+  });
 });
 
 describe("topics", () => {

@@ -1,6 +1,7 @@
 import { LINKS } from "../../config.ts";
-import { ageWords, CREW_ROLES, crewMemberById, FUN_FACTS, JOKES } from "../content/knowledge.ts";
+import { ageWords, CREW_ROLES, crewMemberById, FUN_FACTS, GROVE_BIRTHDAY, JOKES } from "../content/knowledge.ts";
 import { FEELINGS } from "../content/lexicon.ts";
+import { ORANGE_FACTS } from "../content/silly.ts";
 import type { IntentId } from "../understand/intents.ts";
 import { channel, curiousWord, dayOffsetIn, EMOJI, type Reply, type Responder, safeWord, type Turn } from "./turn.ts";
 
@@ -389,6 +390,137 @@ const why: Responder = turn => {
   return { text: turn.picker.pick("why", [`well, ${line.gloss}`, `because ${line.gloss}!`, `hmm, mostly because ${line.gloss}`]), gloss: line.gloss, act: "why", topic: line.topic, feel: "chat" };
 };
 
+// Politics stays out of the server, so Grove has no opinions about politicians.
+// Its only opinion is about oranges.
+const politics: Responder = turn => {
+  const { picker } = turn;
+  if (turn.intent.slots["who"] === "trump") {
+    const fact = picker.pick("orange.fact", ORANGE_FACTS);
+    return {
+      text: picker.pick("politics.orange", [
+        `the only orange thing i have opinions about is the fruit! did you know ${fact}? 🍊`,
+        `i don't do politics, i do produce. here's an orange fact: ${fact} 🍊`,
+        "knock knock. who's there? orange. orange who? orange you glad i don't talk about politics? 🍊",
+        `politics makes my leaf droop, so here's an orange fact instead: ${fact} 🍊`,
+        `orange you glad i'm a slime and not a politician? fun fact: ${fact}`,
+      ]),
+      gloss: "i don't talk about politics, so i shared an orange fact instead",
+      act: "politics",
+      feel: "chat",
+    };
+  }
+  return {
+    text: picker.pick("politics", [
+      "i'm a slime, i don't do politics! the only thing i vote on is which moss patch gets my nap. let's keep the server politics free :)",
+      "politics? *hides under my leaf* way too serious for a slime. ask me about moss, the mods, or my favorite color instead!",
+      `the moss patch is a politics free zone! here's a fun fact instead: ${picker.pick("fact", FUN_FACTS)}`,
+    ]),
+    gloss: "i don't talk about politics, and the server stays politics free",
+    act: "politics",
+    feel: "chat",
+  };
+};
+
+type Subject = "math" | "writing" | "science" | "history" | "language" | "geography" | "coding" | "art" | "music";
+
+const SUBJECT_WORDS: ReadonlyArray<readonly [RegExp, Subject]> = [
+  [/\b(math|maths|algebra|geometry|calculus|trigonometry|trig|fractions|arithmetic|equations?|multiplication|division|times tables?)\b/, "math"],
+  [/\b(essays?|english|writing|reading|book reports?|poems?|poetry|grammar|spelling|literature|stories)\b/, "writing"],
+  [/\b(science|chemistry|physics|biology|experiments?|lab report)\b/, "science"],
+  [/\b(history|social studies)\b/, "history"],
+  [/\b(spanish|french|german|italian|japanese|chinese|latin|languages?)\b/, "language"],
+  [/\b(geography|maps?)\b/, "geography"],
+  [/\b(coding|programming|computer science)\b/, "coding"],
+  [/\b(art|drawing)\b/, "art"],
+  [/\bmusic\b/, "music"],
+];
+
+const SUBJECT_LINES: Readonly<Record<Subject, readonly string[]>> = {
+  math: [
+    "math i can help with! send me the problems one at a time, like 'what's 24 divided by 5', and i'll bounce on my calculator. you still have to write them down though, i don't have hands",
+    "ooh, math! ask me one problem at a time and we'll check them together. i can even do the x ones, like 2x + 3 = 7",
+  ],
+  writing: [
+    "an essay? i only know one word really well, and it's moss. 500 words of moss probably won't get a good grade",
+    "i'd write the whole thing about moss and frogs. your teacher would be so confused. you've got this though!",
+  ],
+  science: [
+    "the only science i know is slime science: slimes split into smaller slimes when they get hit. that's my whole textbook",
+    "i know moss loves rain and frogs eat slimes. that's all my science, sorry!",
+  ],
+  history: [`my history only goes back to ${GROVE_BIRTHDAY.said}, ${GROVE_BIRTHDAY.year}, so unless your homework is about me, i'm not much help`],
+  language: ["i only speak english and a little bit of slime. blub means hello. that's all i've got"],
+  geography: ["i know where every channel on this server is! that's kind of geography, right?"],
+  coding: ["coding? i'd just make the keyboard sticky. but i believe in you!"],
+  art: ["draw a slime! teachers love slimes. probably"],
+  music: ["🎶 blub blub bloop 🎶 that's all the music theory i know"],
+};
+
+function subjectIn(text: string): Subject | null {
+  return SUBJECT_WORDS.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
+
+// Homework: Grove can't do it for anyone (no hands), but it cheers, helps with
+// the math, and is honest about everything else.
+const homework: Responder = turn => {
+  const text = turn.reading.text;
+  const subject = subjectIn(text);
+  const { picker } = turn;
+  const done = (line: string, gloss: string, extra: Partial<Reply> = {}): Reply => ({ text: line, gloss, act: "homework", feel: "chat", ...extra });
+
+  if (/\b(finished|completed|turned in|handed in|submitted)\b|\bdone with (my|the)\b|\b(homework|hw|essay|assignment|project) is (done|finished)\b|\bi (did|wrote) (my|the|an|a)\b/.test(text)) {
+    return done(picker.pick("homework.done", ["you finished it?! that's awesome!! now you can relax. maybe sit in some moss", "yay!! homework done is the best feeling. proud of you"]), "i'm happy you finished your homework", { feel: "good_news" });
+  }
+  if (/\b(forgot|did not do|never did|skipped|lost) (my|the|our|to do)\b/.test(text)) {
+    return done(picker.pick("homework.forgot", ["oh no! maybe tell your teacher, they might give you a little more time. homework first next time, moss breaks after!", "uh oh... it happens! i forget things all the time, my memory is mostly moss. you can still do it now!"]), "it happens, and you can still fix it", { feel: "sad_news" });
+  }
+  if (/\b(due|deadline)\b/.test(text)) {
+    const when = /\b(tomorrow|tonight|today|right now|in an hour|in \w+ (minutes|hours)|on \w+day|next week|this week|soon)\b/.exec(text)?.[1];
+    return done(picker.pick("homework.due", [`due ${when ?? "soon"}?! eek, better get started! i'll be right here cheering *bounces nervously*`, `${when ?? "soon"}?? okay, deep breath. one question at a time, you've got this!`]), "you should get started on it, and you can do it");
+  }
+  if (/\b(test|quiz|exam|exams|midterms?|finals)\b/.test(text)) {
+    return done(picker.pick("homework.test", ["good luck on your test!! you've got this. a slime's blessing: *boops you with my leaf*", "a test? study a bit, sleep well, and eat something. i'll be rooting for you!"]), "good luck on your test");
+  }
+  if (/\b(answers?|solutions?) (to|for)\b|\b(question|number|problem|exercise) \d+\b/.test(text)) {
+    return done("i can't see your worksheet from here... tell me the actual question and i'll try! if it's math, i'm pretty good with a calculator to bounce on", "i can't see the questions, but i can help if you tell me one");
+  }
+  if (/\bshould i\b/.test(text)) {
+    return done(picker.pick("homework.should", ["yes!! homework first, then moss breaks. that's the slime rule", "do it now and future you will be so happy. future me says hi"]), "you should do your homework first");
+  }
+  if (/\b(do|write|finish|answer|complete|solve) (my|the|this|our|me an?|it|them|all)\b|\bcan do my\b|\bdo it for me\b/.test(text)) {
+    if (subject !== null) return done(picker.pick(`homework.${subject}`, SUBJECT_LINES[subject]), "i can't do homework for you, but i can help a little");
+    return done(
+      picker.pick("homework.request", [
+        "homework? that doesn't sound fun... and i'm a slime, the pencil would get all sticky. but i'll cheer you on! *waves a tiny moss pom-pom*",
+        "i can't do your homework, i don't have hands! but i can be your study buddy. you do the work, i'll do the wobbling",
+        "the last time i tried homework, the paper turned into a puddle. you've got this though! and if there's math, ask me and i'll help you check it",
+      ]),
+      "i can't do homework for you, i'm a slime with no hands, but i can cheer you on and help with math",
+    );
+  }
+  if (/\b(help|teach|tutor|explain|study|studying)\b/.test(text)) {
+    if (subject !== null) return done(picker.pick(`homework.${subject}`, SUBJECT_LINES[subject]), "i was offering to help with your homework");
+    return done(
+      picker.pick("homework.help", ["i can try! i'm good at counting (sort of) and cheering. what subject is it?", "of course! what's it on? if it's math, send me the problem and we'll work it out together"]),
+      "i want to help, i just need to know the subject",
+      { expect: { kind: "homework_subject" } },
+    );
+  }
+  if (/\b(bad|terrible|awful|horrible|not good|struggling|failing|stuck)\b/.test(text)) {
+    const extra = subject === "math" ? " send me a problem and we'll do it together!" : "";
+    return done(`you're not bad at it, it's just tricky! everyone gets stuck sometimes.${extra}`, "you're doing better than you think", { feel: "sad_news" });
+  }
+  return done(
+    picker.pick("homework.vent", [
+      "ugh, homework :( that doesn't sound fun at all. take it one bit at a time, and take moss breaks!",
+      "aw, that sounds like a lot. you've got this though! *sits next to you for moral support*",
+      "homework is the worst. i believe in you! small breaks help, i recommend naps",
+    ]),
+    "homework isn't fun, but you can do it",
+    { feel: "sad_news" },
+  );
+};
+
 // Answers to something Grove asked a moment ago. Returns null when the message
 // does not look like an answer, so the normal intent handling runs instead.
 export function answerExpectation(turn: Turn): Reply | null {
@@ -397,6 +529,27 @@ export function answerExpectation(turn: Turn): Reply | null {
   const id: IntentId = turn.intent.id;
 
   switch (expectation.kind) {
+    case "homework_subject": {
+      if (id === "math") return null;
+      const subject = subjectIn(turn.reading.text);
+      if (subject === null) return null;
+      return { text: turn.picker.pick(`homework.${subject}`, SUBJECT_LINES[subject]), gloss: "i was helping with your homework", act: "homework", feel: "chat", expect: null };
+    }
+    case "dumb_answer": {
+      if (!["statement", "question", "agree", "disagree", "ack", "share_feeling", "slang"].includes(id)) return null;
+      return {
+        text: turn.picker.pick("dumb.reply", [
+          "whoa... that actually makes sense. i'm writing it on my leaf",
+          "hmm, my moss disagrees, but i'll allow it",
+          "that's even dumber than my question. i love it",
+          "*thinks so hard a flower falls off* ...yeah. yeah, you're right",
+        ]),
+        gloss: "i liked your answer to my dumb question",
+        act: "dumb_question",
+        feel: "chat",
+        expect: null,
+      };
+    }
     case "their_day":
     case "their_feeling": {
       if (id === "share_feeling" || id === "statement" || id === "agree" || id === "disagree" || id === "ack") {
@@ -423,8 +576,11 @@ const statement: Responder = turn => {
   if (turn.repliedLine !== null && sentiment < -0.3) {
     return { text: picker.pick("stmt.aboutme.bad", ["aw, sorry :( i'll try to do better", "oh no, did i say something wrong?"]), gloss: "sorry if that wasn't helpful", feel: "sad_news" };
   }
-  const news = newsIn(turn);
+  const news = newsIn(turn) ?? mishapIn(turn);
   if (news !== null) return news;
+  if (/\b(on|set to|in) dnd\b|\bdo not disturb\b/.test(turn.reading.text)) {
+    return { text: "do not disturb mode? okay! *whispers* i'll be very quiet", gloss: "you're busy, so i'll stay quiet", feel: "chat" };
+  }
   if (sentiment > 0.3) return { text: picker.pick("stmt.good", ["yay!! that's awesome :D", "ooh nice!!", "that's so cool!", "love that for you!"]), gloss: "that sounds great", feel: "good_news" };
   if (sentiment < -0.3) return { text: picker.pick("stmt.bad", ["aw, that sounds rough :( *pats you with a tiny slime hand*", "oh no :( i'm sorry", "that's not fun at all"]), gloss: "i'm sorry that happened", feel: "sad_news" };
 
@@ -449,6 +605,17 @@ const statement: Responder = turn => {
     miss: true,
   };
 };
+
+// "i lost my cap", "i broke my phone": small bad news.
+function mishapIn(turn: Turn): Reply | null {
+  const match = /\bi (?:just )?(?<verb>lost|broke|dropped|spilled|forgot) (?:my|a|an|the) (?<thing>[a-z]+)\b/.exec(turn.reading.text)?.groups;
+  const thing = safeWord(match?.["thing"], 16);
+  if (match === undefined || thing === null) return null;
+  const reply = (text: string): Reply => ({ text, gloss: `i'm sorry about your ${thing}`, feel: "sad_news" });
+  if (match["verb"] === "lost") return reply(`oh no, your ${thing}! i hope you find it soon. have you checked under the moss?`);
+  if (match["verb"] === "forgot") return reply(`oh no! i forget things all the time too. my memory is mostly moss`);
+  return reply(`oh no, your ${thing}! :( *pats you with a tiny slime hand*`);
+}
 
 const PETS = new Set(["dog", "puppy", "cat", "kitten", "bird", "fish", "hamster", "bunny", "rabbit", "turtle", "snake", "lizard", "parrot", "pet"]);
 const NOT_NEWS = new Set(["question", "problem", "idea", "issue", "bug", "doubt", "feeling", "headache", "test", "exam", "cold", "flu", "crash", "error"]);
@@ -475,5 +642,5 @@ export const SOCIAL: Partial<Record<IntentId, Responder>> = {
   greet, farewell, thank, apologize, laugh, ack, agree, disagree,
   how_are_you: howAreYou, how_is_day: howIsDay, what_doing: whatDoing, ask_thinking: thinking,
   ask_feeling: askFeeling, share_feeling: shareFeeling, distress, confused, statement, why, more, doubt, where_am_i: whereAmI,
-  ask_now: now,
+  ask_now: now, politics, homework,
 };

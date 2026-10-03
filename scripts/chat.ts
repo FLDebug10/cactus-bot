@@ -66,6 +66,7 @@ function send(author: string, text: string, replyToGrove: boolean): void {
     grove.observe({ ...message, id: sentId, authorId: GROVE_ID, authorName: "Grove", authorIsBot: true, content: decision.text, replyToId: message.id, replyToAuthorId: message.authorId, mentionsGrove: false, createdAt: now });
     lastGroveMessage = { id: sentId };
     console.log(`grove: ${decision.text}`);
+    if (decision.command !== null) console.log(`   (sends the !${decision.command} list instead)`);
   }
   if (decision.files.length > 0) console.log(`   (attaches ${decision.files.join(", ")})`);
   if (decision.reactions.length > 0) console.log(`   (reacts ${decision.reactions.join(" ")})`);

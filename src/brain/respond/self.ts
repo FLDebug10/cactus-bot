@@ -373,9 +373,20 @@ const favorite: Responder = turn => {
   };
 };
 
+// Things Grove has a particular opinion about.
+const OPINIONS: Readonly<Record<string, string>> = table({
+  math: "i like it when i get to bounce on the calculator! the numbers past seven are a little scary though",
+  maths: "i like it when i get to bounce on the calculator! the numbers past seven are a little scary though",
+  school: "school sounds fun! do they have moss there?",
+  oranges: "oranges are great! i know so many orange facts. ask me for one 🍊",
+  orange: "oranges are great! i know so many orange facts. ask me for one 🍊",
+});
+
 const likeThing: Responder = turn => {
   const verb = turn.intent.slots["verb"] ?? "like";
   const thing = (turn.intent.slots["thing"] ?? "").trim();
+  const particular = OPINIONS[thing];
+  if (particular !== undefined && verb !== "hate" && verb !== "dislike") return { text: particular, gloss: `that's how i feel about ${thing}`, feel: "chat" };
   const words = thing.split(" ");
   const liked = words.find(word => LIKES.has(word));
   const disliked = words.find(word => DISLIKES.has(word));
@@ -413,8 +424,11 @@ const likeThing: Responder = turn => {
 };
 
 const ability: Responder = turn => {
-  const verb = turn.intent.slots["verb"] ?? "";
+  const asked = turn.intent.slots["verb"] ?? "";
   const rest = turn.intent.slots["rest"] ?? "";
+  // "can you do math?" asks about math, not about doing.
+  const object = /^ (?:(?:a|an|the|some) )?(?<word>[a-z]+)/.exec(rest)?.groups?.["word"];
+  const verb = asked === "do" && object !== undefined && ABILITIES[object] !== undefined ? object : asked;
   const known = verb === "play" && /\bminecraft\b/.test(rest) ? ABILITIES["minecraft"] : ABILITIES[verb];
   if (known !== undefined) return { text: known.line, gloss: known.can ? `yes, i can ${verb}` : `no, i can't ${verb}`, act: `ability.${verb}`, feel: "chat" };
   const safe = safeWord(verb, 14);
@@ -1041,6 +1055,82 @@ const frogAlert: Responder = turn => {
   return reply(picker.pick("frog", ["WHERE?!! *hides behind the orb of origin*", "AAAA *bounces away as fast as i can*", "f-frog?? *hides under my leaf*"]));
 };
 
+// "all over the streets of england", "on my wall": where the posters are going.
+function placeIn(text: string): string | null {
+  const place = /\b(?:all over|around|across|throughout|everywhere in|in|on) (?:the )?(?:(?:streets|walls|roads|city|cities|town|towns|country|halls|whole) (?:of|in) )?(?:the )?(?<place>[a-z]+(?: [a-z]+)?)$/.exec(text)?.groups?.["place"];
+  if (place === undefined || /^(you|me|it|them|there|here|grove|everywhere)\b/.test(place)) return null;
+  return safeWord(place.replace(/^my /, "your "), 24);
+}
+
+function placeRemark(place: string): string {
+  if (/\b(england|britain|uk|london|scotland|wales|ireland)\b/.test(place)) return " do they have moss there? oh wait, it rains there all the time. i'd LOVE it there";
+  if (/\bschool\b/.test(place)) return " the teachers are gonna be so confused";
+  if (/\b(world|earth|planet|universe)\b/.test(place)) return " the whole world?? that's so many posters";
+  if (/\b(wall|room|bedroom|house|door|ceiling|locker)\b/.test(place)) return " i'll watch over you. in a cute way";
+  return "";
+}
+
+// What a fan said they'd do, and how Grove takes it. The first match wins.
+const FAN_DETAILS: ReadonlyArray<readonly [RegExp, (turn: Turn) => readonly string[]]> = [
+  [/\bposters?\b/, turn => {
+    const place = placeIn(turn.reading.text);
+    if (place === null) return ["posters of me?? *wobbles so hard a flower falls off* please use my good side. it's the leafy side", "posters?? okay but i get to pick the picture. moss must be fluffed and the leaf must be perky"];
+    const remark = placeRemark(place);
+    return [
+      `posters of me all over ${place}?? *wobbles so hard a flower falls off* please use my good side. it's the leafy side.${remark}`,
+      `${place} isn't ready for this much slime!! make sure the posters are waterproof, i'm mostly water and i'd hate to see myself get soggy.${remark}`,
+    ];
+  }],
+  [/\bfan ?clubs?\b/, () => ["a grove fan club?? can i be president? first meeting is at my moss patch. bring snacks (moss)", "a fan club!! rules: 1. be nice 2. no frogs 3. that's it"]],
+  [/\bautographs?\b/, () => ["*stamps a little slimy splat on your paper* there! a grove original. keep it out of the sun or it'll dry up", "*signs with my whole body* it's a bit sticky, but that's how you know it's real"]],
+  [/\b(fan ?art|drew|drawn|drawing|painted|painting|portrait)\b/, () => ["you made art of me?? drizzo drew the very first me, so you're in great company! i hope you gave me extra moss"]],
+  [/\b(statues?|shrines?|murals?|figurine)\b/, () => ["a statue of me?? make it bouncy please. and put it near a pond, but NOT a frog pond"]],
+  [/\btattoos?\b/, () => ["a tattoo of me?? now i'll be on you forever! i hope you like moss"]],
+  [/\bnam(e|ing) (my|our) \w+/, turn => {
+    const pet = safeWord(/\bnam(?:e|ing) (?:my|our) (?<pet>\w+)/.exec(turn.reading.text)?.groups?.["pet"], 14) ?? "pet";
+    return [`you're naming your ${pet} after me?? tell them they have a lot of bouncing to live up to`];
+  }],
+  [/\b(merch|t shirts?|shirts?|hoodies?|plushies|plushie|plush|cosplay)\b/, () => ["grove merch?? i'd buy it! with my three shiny pebbles", "a grove plushie would be the softest thing ever. i'd hug it. is that weird? hugging myself?"]],
+  [/\b(songs?|movie|fanfic|fan fiction|website|fan page|fanpage)\b/, () => ["something about me?? if it's a song, it has to go 'blub blub bloop'. that's the law"]],
+  [/\b(stan|stanning|worship|idolize|idolise|obsessed)\b/, () => ["you stan me?? i'm just a little slime... but okay! i'll try to be stan-worthy *poses with my leaf*"]],
+  [/\b(idol|hero|role model|inspiration|icon|celebrity)\b/, () => ["your hero?? i'm scared of frogs and i can only count to seven! but i'll try my very best to be a good one"]],
+  [/\b(selfie|picture|photo|pic)\b/, () => ["*squishes into frame* say moss! 📸"]],
+  [/\b(president|vote)\b/, () => ["president of the moss patch? i accept! my first law: free naps for everyone"]],
+  [/\b(famous|tell (everyone|everybody|the world))\b/, () => ["famous?? *puts on tiny sunglasses* no autographs please. okay, one autograph"]],
+];
+
+// "i'm a big fan of slimekin": what they like, which Grove may like too.
+function fanOf(turn: Turn, thing: string): Reply {
+  const words = thing.split(" ");
+  const safe = safeWord(thing, 24);
+  const reply = (text: string): Reply => ({ text, gloss: `you like ${safe ?? "that"}, and that's cool`, act: "fan_of", feel: "chat" });
+  if (/\b(frogs?|toads?)\b/.test(thing)) return reply("a fan of frogs?? *scoots away a little* they EAT slimes, you know");
+  if (/\b(origins|apoli|overgrown|slimekin|slimes?|moss)\b/.test(thing)) return reply(turn.picker.pick("fanof.mine", [`me too!! ${safe ?? "it"} is the best. we have great taste`, `a fellow ${safe ?? "that"} fan! *happy wobble*`]));
+  if (words.some(word => DISLIKES.has(word))) return reply(`${safe ?? "that"}? ${DISLIKE_REASONS[words.find(word => DISLIKES.has(word))!] ?? "not my thing"} but i won't judge!`);
+  return reply(safe !== null ? turn.picker.pick("fanof", [`ooh, a ${safe} fan! good taste`, `nice! what's your favorite thing about ${safe}?`]) : "ooh, nice! good taste");
+}
+
+// "i'm your biggest fan, i'm putting posters of you all over england".
+const fan: Responder = turn => {
+  const text = turn.reading.text;
+  const { picker } = turn;
+  const theirs = turn.intent.slots["of"];
+  if (theirs !== undefined) return fanOf(turn, theirs);
+  const loved = /\bi (love|adore) (you|grove)\b/.test(text) ? picker.pick("lead.love", ["love you too!! ", "aww, love you too! "]) : "";
+  const biggest = /\b(biggest|number one|number 1|no 1|greatest|top|ultimate|diehard|die hard|1st|forever) fans?\b|\b(your|grove s|groves) (1 )?fans?\b/.test(text);
+  const detail = FAN_DETAILS.find(([pattern]) => pattern.test(text));
+  const happy = (line: string): Reply => ({ text: line, gloss: "i'm so happy you're a fan of me", act: "fan", feel: "compliment", affinity: 0.06, reactions: picker.chance(0.5) ? [EMOJI.heart] : [] });
+  if (detail !== undefined) {
+    const opener = biggest ? picker.pick("fan.opener", ["my BIGGEST fan?? ", "my number one fan?? *gasps* ", "a fan?? of ME?? "]) : "";
+    return happy(`${loved}${opener}${picker.pick(`fan.${detail[0].source}`, detail[1](turn))}`);
+  }
+  return happy(loved + picker.pick("fan", [
+    "a fan?? of ME?? i didn't even know i had fans! *spins around* do you want an autograph? it's just a little slime splat, but it's yours",
+    `my number one fan! i'm gonna tell the orb of origin about you ${EMOJI.orb}`,
+    "*wobbles bashfully* thank you!! i'm just a slime who sits in moss, but you make me feel famous",
+  ]));
+};
+
 export const SELF: Partial<Record<IntentId, Responder>> = {
   ask_identity: identity, ask_is_bot: isBot, ask_alive: alive, ask_gender: gender, claim_about_grove: claim,
   ask_species: species, ask_age: age, ask_name: nameOrigin, ask_creator: creator, ask_home: home,
@@ -1049,6 +1139,6 @@ export const SELF: Partial<Record<IntentId, Responder>> = {
   ask_ability: ability, ask_attribute: attribute, insult, ask_insult: askInsult, compliment, favorite_person: favoritePerson,
   ask_body: body, ask_size: size, can_i_you: canI, hypothetical, favorite_guess: favoriteGuess, ask_origin_story: originStory,
   ask_compliment: askCompliment, love, hate, affection, aggression,
-  ask_crew: crew, ask_fear: fear, ask_have: have, give, self_how: selfHow, command, frog_alert: frogAlert,
+  ask_crew: crew, ask_fear: fear, ask_have: have, give, self_how: selfHow, command, frog_alert: frogAlert, fan,
 };
 

@@ -15,16 +15,22 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
+// The text a !command would reply with, for decisions that answer with one
+// ("what commands do you have?" gets the !help list). Null when there is none.
+export type CommandOutput = (name: string) => string | null;
+
 // Connects Grove's brain to Discord: every message is shown to the brain, and
 // its decisions become typing, replies and reactions.
 export class GroveChat {
   private readonly grove: Grove;
   private readonly client: Client;
+  private readonly commandOutput: CommandOutput;
   private readonly pending = new Map<string, Pending>();
 
-  constructor(grove: Grove, client: Client) {
+  constructor(grove: Grove, client: Client, commandOutput: CommandOutput) {
     this.grove = grove;
     this.client = client;
+    this.commandOutput = commandOutput;
   }
 
   observe(message: Message): void {
@@ -68,8 +74,9 @@ export class GroveChat {
 
     let sentId: string | null = null;
     if (decision.text !== null) {
+      const content = (decision.command !== null ? this.commandOutput(decision.command) : null) ?? decision.text;
       const sent = await message.reply({
-        content: decision.text,
+        content: content.slice(0, 2000),
         files: decision.files.map(name => new AttachmentBuilder(asset(name), { name })),
         allowedMentions: { parse: [], repliedUser: false },
         failIfNotExists: false,

@@ -115,13 +115,17 @@ export function read(raw: string, groveId: string | null): Reading {
     emojis.push("heart");
     return " ";
   });
+  // "D&D", "d & d" and "dungeons and dragons" are one word to Grove. The "&" would split it in two.
+  const dnd = (written: string) => (written === written.toUpperCase() ? "DND" : "dnd");
+  text = text.replace(/\bd\s*&\s*d\b/gi, dnd).replace(/\bdungeons?\s*(?:&|and|n)\s*dragons?\b/gi, dnd);
 
   for (const match of text.matchAll(/\p{Extended_Pictographic}/gu)) emojis.push(match[0]);
 
   const letters = text.replace(/[^\p{L}]/gu, "");
   const shouting = letters.length >= 6 && letters === letters.toUpperCase() && letters !== letters.toLowerCase();
 
-  const actionMatch = /(?:^|\s)[*_]([^*_\n]{2,80})[*_](?=\s|$)/.exec(text);
+  // "*pets grove*" is roleplay, "5 * 3 * 2" is not: an action needs a letter in it.
+  const actionMatch = /(?:^|\s)[*_](?=[^*_\n]*\p{L})([^*_\n]{2,80})[*_](?=\s|$)/u.exec(text);
 
   text = text
     .toLowerCase()
@@ -156,6 +160,12 @@ export function read(raw: string, groveId: string | null): Reading {
     if (SPLITTING_AUXILIARIES.has(rawToken) && (nextRaw === "you" || nextRaw === "u") && clause.length >= 2 && !clause.some(token => QUESTION_WORDS.has(token))) {
       closeClause();
       pendingBoundary = true;
+    }
+    // "sorry if this is a dumb question but how do i install it": the real question starts after "but".
+    if (rawToken === "but" && clause.length >= 3 && clause[clause.length - 1] === "question" && /^(dumb|stupid|silly)$/.test(clause[clause.length - 2] ?? "")) {
+      closeClause();
+      pendingBoundary = true;
+      continue;
     }
     if (/^[?!.,;:]+$/.test(rawToken)) {
       if (rawToken.includes("?")) {

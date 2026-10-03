@@ -1,6 +1,6 @@
 import { LINKS } from "../../config.ts";
 import { downloadLine, MOD_FACTS, ORIGIN_BY_ID, ORIGINS, SERVER_FACTS } from "../content/knowledge.ts";
-import { SLANG_TERMS } from "../content/lexicon.ts";
+import { slangIn } from "../content/slang.ts";
 import { KNOWN_WORDS } from "../content/words.ts";
 import type { IntentId } from "../understand/intents.ts";
 import { findTopics, type Topics } from "../understand/topics.ts";
@@ -249,12 +249,11 @@ const install: Responder = turn => ({
   topic: "install",
 });
 
-const commands: Responder = turn => ({
-  text: turn.picker.pick("commands", [
-    "type !help and i'll show you all my commands! you can also just talk to me, say my name or reply to one of my messages",
-    "!help has the whole list! and you can always chat with me, i'll do my best",
-  ]),
-  gloss: "!help lists my commands",
+// "what commands do you have?" gets the real !help list, sent as Grove's reply.
+const commands: Responder = () => ({
+  text: "here's everything i can do!",
+  command: "help",
+  gloss: "that was my !help list, all my commands",
   act: "commands",
   topic: "commands",
 });
@@ -323,8 +322,8 @@ const define: Responder = turn => {
   if (has("modrinth") || has("curseforge")) return { text: `it's a site for downloading mods! ${downloadLine()}`, gloss: "a website for downloading mods", act: "define.download", topic: "download" };
   if (has("apace") || has("apace100")) return { text: `${MOD_FACTS.remake[0]}`, gloss: "overgrown's mods are remakes of apace's", act: "define.apace", topic: "origins" };
   if (has("server") || has("discord") || term === "this place" || term === "this server") return { text: `${SERVER_FACTS.about}!`, gloss: "this is the overgrown's origins server", act: "define.server" };
-  const slang = words.find(word => SLANG_TERMS[word] !== undefined);
-  if (slang !== undefined) return { text: `${slang}? i've heard people say it but i'm way too mossy to understand it`, gloss: `i don't really know what ${slang} means`, act: "define.slang" };
+  const slang = slangIn(term);
+  if (slang !== null) return { text: slang.meaning, gloss: slang.meaning, act: "define.slang" };
 
   // A one or two word thing Grove has never heard of gets curiosity. A longer
   // question ("the capital of france") is general knowledge, and Grove says so.

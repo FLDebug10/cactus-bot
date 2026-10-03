@@ -32,7 +32,8 @@ function label(command: Command): string {
   return [command.name, ...(command.aliases ?? [])].map(name => `\`${COMMAND_PREFIX}${name}\``).join(" / ");
 }
 
-function helpText(services: Services): string {
+// The !help list. Grove also sends it when someone asks what commands it has.
+export function helpText(services: Services): string {
   const everyone = COMMANDS.filter(command => !command.hidden && !command.staffOnly);
   const staff = COMMANDS.filter(command => !command.hidden && command.staffOnly);
   const custom = services.customCommands.all();

@@ -25,6 +25,9 @@ Grove's answers about itself all come from one canon, so it never contradicts it
 - Its birthday is **September 27th, 2026**, the day Drizzo wrote its first code. It knows how old it is.
 - It has no gender, so it picks one each morning as a mood (see `state/day.ts`).
 - A cactus lived on the server before Grove. Grove has never been a cactus.
+- It can't count past seven in its head, so it bounces on a calculator for bigger sums (and gets them right).
+- It loves D&D, where slimes are called oozes: its favorite class is druid, its favorite species is plasmoid (ooze people), and the gelatinous cube is its "famous cousin".
+- It has no opinions about politics. Ask about Donald Trump and you get an orange joke or a true orange fact instead.
 
 ## Running it
 
@@ -63,10 +66,10 @@ src/
     grove.ts            the brain: decides whether to speak and what to say
     types.ts            the neutral message and decision shapes
     text/               reading: cleanup, slang, contractions, typo repair
-    understand/         meaning: intents, topics, who is being addressed, sentiment
+    understand/         meaning: intents, topics, who is being addressed, sentiment, sums
     state/              short-term conversations, mood, daily life, long-term memory
     respond/            what to say, per kind of message, and Grove's typing voice
-    content/            word lists, lexicons, facts about the mods and the server
+    content/            word lists, lexicons, slang, facts about the mods, the server, d&d and more
   commands/             !commands (one declarative list) and the /register slash commands
   features/             chat adapter, modmail, media gallery, suggestion tags
   discord/              discord.js setup and small helpers
@@ -95,6 +98,19 @@ Every message goes through the same steps:
    - *Memory* (SQLite): names, nicknames, how warm Grove feels toward each person, and the messages it failed to understand.
 4. **Respond** (`brain/respond/`). Each intent has a responder that picks from varied lines without repeating itself. Silly questions get answers in character: what Grove has ("do you have pockets?"), what scares it, what it would do as a human, the time and weather in its moss patch, small requests ("say something", "tell me a story", "count to 10"), and roleplay ("*puts grove in pocket*"). Then the voice filter makes it Grove: lowercase (a word written in capitals on purpose, like "frogs EAT slimes", stays), no em dashes or semicolons, at most one custom emoji, and a small flourish that follows its mood (never on sad news or help answers).
 
+### What Grove can talk about
+
+| People say | Grove does |
+| --- | --- |
+| "whats 24 divided by 5", "what is 20 time 30", "50*(12+8)", "15% of 80", "solve 2x + 3 = 7", "is 7 x 8 56?" | Works it out (`understand/arithmetic.ts`): words or symbols, brackets, powers, roots, percentages, remainders, simple equations, checking an answer. "i rate it 10/10" or "2-3 weeks" are never taken for sums. |
+| "can you do my homework", "help me with math", "my essay is due tomorrow" | Can't do it (no hands), but cheers them on, helps with the math part, asks what subject it is, and wishes luck on tests. |
+| "i'm your biggest fan, posters of you all over england" | Gets flustered and excited about whatever they said: posters (and where), fan clubs, autographs, fan art, tattoos, naming a pet after it. |
+| "what are dumb questions", "why is there a zero button on the microwave?" | Explains them with an example, gives its own dumb answers to classic dumb questions, and asks its own ("ask me a dumb question"). |
+| "can u tell me some commands you have?" | Replies with the `!help` list itself. |
+| "what's your favourite D&D class?", "what's a gelatinous cube", "roll for initiative", "roll 2d6+3" | Knows D&D classes, species, monsters (oozes!) and rules terms, its own favorites, and slimes in other games (Dragon Quest, Rimuru, Slime Rancher, Terraria). |
+| "what do you think of Donald Trump?" | An orange joke or an orange fact. Other politics gets a polite "the server stays politics free". |
+| "are you mewing", "do you mew", "hit the griddy", "do you mog", "what does rizz mean" | Slang is answered the way it was used: asked about Grove, asked of Grove, said about Grove, said about yourself, or asked what it means. Some words Grove deliberately never explains.
+
 ### When Grove speaks up
 
 | Situation | Grove does |
@@ -113,7 +129,9 @@ Grove never pings anyone.
 - **A new kind of message**: add a frame to `FRAMES` in `src/brain/understand/intents.ts` (and the id to `IntentId`), then a responder in the matching `src/brain/respond/*.ts` file.
 - **New facts**: `src/brain/content/knowledge.ts` (mods, origins, server, and Grove's own canon) or the glossary in `src/brain/respond/help.ts`.
 - **Things Grove can do**: `ABILITIES` in `src/brain/content/lexicon.ts` answers "can you X?", "do you X?" and "X!" all at once.
-- **New slang or words**: `src/brain/content/words.ts` and `lexicon.ts`. If you add a word to `CORRECTION_TARGETS`, run `npm run speller`.
+- **New slang**: add a term to `SLANG` in `src/brain/content/slang.ts`, with its meaning and lines for each way it gets used (asked, told, said about Grove, said about yourself). Put phrases before the single words inside them.
+- **D&D and fantasy**: `src/brain/content/fantasy.ts`. **Dumb questions and orange facts**: `src/brain/content/silly.ts`. `test/content.test.ts` checks every line there for dashes and semicolons.
+- **Other words**: `src/brain/content/words.ts` and `lexicon.ts`. If you add a word to `CORRECTION_TARGETS`, run `npm run speller`.
 - **See what Grove got wrong**: staff can run `!misses` in Discord.
 - Add a test next to the ones in `test/conversation.test.ts`, and try it out with `npm run chat`.
 

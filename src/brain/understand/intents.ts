@@ -1,11 +1,15 @@
-import { AGE_WORDS, ALIVE_WORDS, BOT_WORDS, COMPLIMENTS, DO_YOU_VERBS, FEELINGS, GENDER_WORDS, INSULTS, PET_NAMES, SIZE_WORDS, SLANG_TERMS } from "../content/lexicon.ts";
+import { AGE_WORDS, ALIVE_WORDS, BOT_WORDS, COMPLIMENTS, DO_YOU_VERBS, FEELINGS, GENDER_WORDS, INSULTS, PET_NAMES, SIZE_WORDS } from "../content/lexicon.ts";
+import { type SlangTerm, type SlangUse, slangIn } from "../content/slang.ts";
+import { DUMB_QUESTIONS } from "../content/silly.ts";
 import { LAUGH_WORDS, LEADING_FILLERS, TRAILING_FILLERS } from "../content/words.ts";
 import type { Clause, Reading } from "../text/reader.ts";
 import { asksThroughName } from "./addressing.ts";
+import { mathIn } from "./arithmetic.ts";
 import type { Topics } from "./topics.ts";
 
 export type IntentId =
   | "distress" | "confused" | "why" | "channels" | "compat" | "bomb" | "follow_up" | "favorite_person" | "more" | "doubt"
+  | "politics" | "fan" | "homework" | "dumb_question" | "fantasy"
   | "where_am_i" | "ask_origin_story" | "ask_body" | "ask_size" | "can_i_you" | "hypothetical" | "favorite_guess"
   | "ask_have" | "ask_fear" | "frog_alert" | "give" | "ask_now" | "ask_crew" | "self_how" | "command"
   | "greet" | "farewell" | "thank" | "apologize" | "laugh" | "ack" | "agree" | "disagree"
@@ -166,6 +170,102 @@ const giving: FrameTest = (core, tokens, reading, topics, clause) => {
   return { what, verb: asked?.["verb"] ?? "give" };
 };
 
+// Politicians and politics. The server stays out of it, and so does Grove.
+const POLITICS = /\b(trump|trumps|biden|kamala|obama|putin|zelensky|netanyahu|starmer|sunak|trudeau|macron|farage|maga|democrats?|republicans?|gop|liberals?|leftists?|conservatives?|tory|tories|politics|political|politicians?|elections?|presidential|congress|senate|parliament|prime minister|left wing|right wing|communis[mt]|socialis[mt]|fascis[mt]|who (should|did|would|will) (i|you) vote for|do you vote)\b|\b(the|our|us|current|american|usa) president\b|\bpresident of (the us|the usa|america|the united states)\b/;
+const NOT_POLITICS = /\btrump (card|cards|suit|suits)\b|\bconservative (estimate|guess)\b|\bliberal (amount|amounts)\b/;
+
+const politics: FrameTest = (_core, _tokens, reading) => {
+  const text = reading.text;
+  if (!POLITICS.test(text) || NOT_POLITICS.test(text)) return null;
+  return { who: /\b(trump|trumps|donald|maga)\b/.test(text) ? "trump" : "other" };
+};
+
+// "i'm your biggest fan", "posters of you all over england", "can i have your autograph".
+const FAN = new RegExp([
+  String.raw`\b(i am|i will be|i will always be|we are) (your|grove s|groves) ((biggest|number one|number 1|no 1|1|greatest|top|first|main|true|real|only|super|huge|largest|best|1st|ultimate|forever) )?fans?\b`,
+  String.raw`\b(i am|we are) (a |such a |the |your )?((big|huge|massive|giant|real|true|super|major|ultimate|diehard|die hard|number one|biggest) )?fans? of (you|grove|yours)\b`,
+  String.raw`\b(biggest|number one|number 1|no 1|ultimate|diehard|die hard) fans?\b(?! of (?!you\b|grove\b))`,
+  String.raw`\bfan ?clubs?\b`, String.raw`\bfan ?art (of|for) (you|grove)\b`, String.raw`\bautographs?\b`, String.raw`\bposters? of (you|grove)\b`,
+  String.raw`\b(statues?|shrines?|tattoos?|plushies|plushie|plush|merch|t shirts?|shirts?|hoodies?|murals?|painting|portrait|songs?|movie|fanfic|fan fiction|website|fan page|fanpage|cosplay|figurine) (of|about|for|with) (you|grove)\b`,
+  String.raw`\b(stan|stanning|worship|idolize|idolise) (you|grove)\b`, String.raw`\bgrove stans?\b`, String.raw`^i stan\b`,
+  String.raw`\byou are (my|our) (idol|hero|role model|inspiration|celebrity|favorite celebrity|icon)\b`,
+  String.raw`\b(selfie|picture|photo|pic) with (you|grove)\b`, String.raw`\bnam(e|ing) (my|our) \w+ (after you|after grove|grove)\b`,
+  String.raw`\bobsessed with (you|grove)\b`, String.raw`\bgrove for president\b`, String.raw`\bvote for grove\b`,
+  String.raw`\bmake you famous\b`, String.raw`\btell (everyone|everybody|the world) about you\b`,
+].join("|"));
+
+const FAN_OF = /\b(i am|we are) (a |such a |the |also a |also the )?((big|huge|massive|giant|real|true|super|major|biggest|number one|diehard|die hard) )?fans? of (?<thing>[a-z0-9 ]{2,30})$/;
+
+const fan: FrameTest = (core, _tokens, reading): Slots | null => {
+  if (FAN.test(reading.text) || /^(i am|we are) (a |such a |the |also a )?(big |huge |massive |giant |real |true |super |major )?fans?$/.test(core)) return {};
+  // "i'm a big fan of slimekin" is about what they like.
+  const thing = FAN_OF.exec(core)?.groups?.["thing"];
+  return thing === undefined ? null : { of: thing };
+};
+
+// Homework, studying and tests: "can you do my homework", "help me with math".
+const SUBJECTS = "math|maths|algebra|geometry|calculus|trigonometry|trig|fractions|arithmetic|science|chemistry|physics|biology|history|geography|english|spanish|french|german|italian|japanese|chinese|latin|spelling|grammar|literature|social studies|economics|coding|programming|computer science";
+const SCHOOL_WORK = /\b(homework|home work|homeworks|assignments?|worksheets?|essays?|book reports?|school ?work|school projects?|science projects?|studying|revising)\b|\b(i|to|need to|have to|help me|gonna|going to) study\b/;
+const SUBJECT_HELP = new RegExp(String.raw`\b(help|teach|tutor|explain)( me)?( with| in| on)? (my |some |this |the )?(${SUBJECTS})\b`);
+const BAD_AT = new RegExp(String.raw`\bi am (so |really |very |kinda |kind of |pretty )?(bad|terrible|awful|horrible|not good|struggling|failing|stuck) (at|with|in|on) (${SUBJECTS})\b`);
+const HATE_SCHOOL = new RegExp(String.raw`\bi (hate|dislike|can not stand) (${SUBJECTS}|school|studying)\b`);
+const SUBJECT_TEST = new RegExp(String.raw`\b(${SUBJECTS}) (test|quiz|exam|homework|assignment|project)\b`);
+const TEST_SOON = /\b(i have|i got|got|have) (a |an |my |another )?(big |huge |hard |scary )?(test|quiz|exam|exams|midterm|midterms|finals) (tomorrow|today|tonight|soon|next week|on \w+|this week|in the morning|later)\b/;
+const WORKSHEET_ANSWER = /\b(answers?|solutions?) (to|for) (question|number|problem|exercise|page)s? \d+\b/;
+
+const homework: FrameTest = (_core, _tokens, reading) => {
+  const text = reading.text;
+  const shorthand = /\b(my|the|our|ur|your|do|doing|finish|finished|with|have|got) hw\b/.test(reading.raw.toLowerCase());
+  return SCHOOL_WORK.test(text) || shorthand || SUBJECT_HELP.test(text) || BAD_AT.test(text) || HATE_SCHOOL.test(text) || SUBJECT_TEST.test(text) || TEST_SOON.test(text) || WORKSHEET_ANSWER.test(text) ? {} : null;
+};
+
+// "what are dumb questions?", "ask me a dumb question", or one of the classics
+// ("why is there a zero button on the microwave?").
+const DUMB = "(dumb|stupid|silly|weird|random|goofy|bad|dumbest|stupidest|silliest)";
+const DUMB_EXPLAIN = new RegExp(String.raw`\bwhat (is|are) (a |an |the )?${DUMB} questions?\b|\bwhat counts as a ${DUMB} question\b|\b(is|are) there (any |really |such a thing as )?(a |an |any )?${DUMB} questions?\b|\bno such thing as a ${DUMB} question\b|^${DUMB} questions\??$`);
+const DUMB_ASK_ME = new RegExp(String.raw`\bask (me|us) (a |an |some |another |your )?${DUMB} questions?\b`);
+const DUMB_EXAMPLE = new RegExp(String.raw`\b(tell|give|say|show) (me |us )?(a |an |some |another |any |your )?(favorite |best )?${DUMB} questions?\b|\bknow (any|a|some) ${DUMB} questions?\b|\bexamples? of (a |an )?${DUMB} questions?\b|\bwhat is (a |an |the |your )?(favorite |best )?${DUMB} question\b`);
+const DUMB_REMARK = new RegExp(String.raw`^(that is|that was|what) (a |such a )?${DUMB} question$|^${DUMB} question$|\b(is|was) (this|that|it) a ${DUMB} question\b|\b(this|it) (is|might be|may be|could be|is probably) a ${DUMB} question\b`);
+// A question in any shape, even typed without a question mark: "grove do fish get thirsty".
+const ASKING = /^(grove )?(do|does|did|is|are|can|could|would|will|should|why|what|which|how|where|when|who|if)\b/;
+
+const dumbQuestion: FrameTest = (core, _tokens, reading, _topics, clause): Slots | null => {
+  const text = reading.text;
+  if (DUMB_EXPLAIN.test(text)) return { kind: "explain" };
+  if (DUMB_ASK_ME.test(text)) return { kind: "ask" };
+  if (DUMB_EXAMPLE.test(text)) return { kind: "example" };
+  if (DUMB_REMARK.test(core)) return { kind: "remark" };
+  if (!clause.question && !reading.question && !ASKING.test(text)) return null;
+  const index = DUMB_QUESTIONS.findIndex(question => question.match.test(text));
+  return index >= 0 ? { kind: "classic", index: String(index) } : null;
+};
+
+// Dungeons & Dragons, where slimes are oozes, and slimes in other games and
+// stories. "dnd" on its own can be Discord's do not disturb.
+const DND_STRONG = /\b(dnd|dungeon master|gelatinous cubes?|ochre jell(y|ies)|black puddings?|gr[ae]y oozes?|oozes?|owlbears?|beholders?|mind flayers?|illithids?|tarrasques?|tieflings?|dragonborn|aasimar|tabaxi|kenku|plasmoids?|warforged|firbolgs?|tortles?|aarakocra|harengon|genasi|paladins?|warlocks?|sorcerers?|artificers?|druids?|(nat|natural) (20|1|one)|roll(ing)? for initiative|saving throws?|spell slots?|cantrips?|wild ?shape|multi ?class(ing)?|tpk|sneak attack|eldritch blast|death saves?|session zero|(lawful|chaotic) (good|neutral|evil)|true neutral|5e|ttrpg|tabletop|(be|wanna be|want to be) (my|our) dm|what alignment|your alignment|alignment are you)\b/;
+const DND_STATUS = /\b(on|set to|turn on|turned on|turn off|my status is|status) dnd\b/;
+const FANTASY_SLIME_NAMES = /\b(rimuru|reincarnated as a slime|tensura|slime ranchers?|plorts?|metal slimes?|king slimes?|dragon quest)\b/;
+const FANTASY_PLACES = /\b(other games?|games|video games?|anime|manga|movies?|shows?|books?|stories|fantasy|cartoons?|famous slimes?|other slimes|terraria)\b/;
+
+const fantasy: FrameTest = (_core, _tokens, reading) => {
+  const text = reading.text;
+  if (DND_STRONG.test(text) && !(DND_STATUS.test(text) && !/\bdnd (class|campaign|character|game|session)\b/.test(text))) return { kind: "dnd" };
+  if (FANTASY_SLIME_NAMES.test(text)) return { kind: "slimes" };
+  if (/\bslimes?\b/.test(text) && FANTASY_PLACES.test(text) && reading.question) return { kind: "slimes" };
+  return null;
+};
+
+// "can u tell me some commands you have?": Grove's own commands, not Minecraft's.
+const GROVE_COMMANDS = /\b(what (commands|can you do)|list (of )?(your |the |all )?commands|(your|grove s|grove|bot|the bot s|all the|all your) commands|show (me )?(the |your |all )?commands|what are (the |your )?commands|help menu|command list|commands list|what can i ask you|commands (do you have|you have|can i use|are there|do you know|you know|can you do|you can do)|(tell|give|show|list) (me |us )?(some|a few|all|any|the|your|of your)( of (your|the))? commands|(any|some|got) commands|do you have (any |some )?commands|how do i use you|what are you able to do|what all can you do|what else can you do)\b/;
+const MINECRAFT_COMMANDS = /\b(minecraft|in game|ingame|command blocks?|execute|function|functions|mcfunction|console|server commands|op|operator|cheats)\b/;
+
+const groveCommands: FrameTest = (_core, _tokens, reading, topics) => {
+  const text = reading.text;
+  if (!GROVE_COMMANDS.test(text)) return null;
+  if (topics.set.has("datapack") || topics.set.has("addon") || MINECRAFT_COMMANDS.test(text) || reading.raw.includes("/")) return null;
+  return {};
+};
+
 const COMMAND = /^(?:please )?(?<verb>say|tell|go|come|sit|stay|stop|spin|roll|jump|hop|hide|run|fly|split|grow|shrink|melt|explode|ping|ban|kick|mute|spam|scream|yell|shout|whisper|bark|meow|moo|quack|purr|roar|wave|smile|blink|wink|look|guess|count|speak|talk|sleep|wake|eat|drink|fight|attack|kill|die|adopt|follow|listen|beg|play|shake|sneeze|cry|laugh|glaze|cook|bake|code|build|draw|write|read|swim|float|glow|photosynthesize|calm|chill|relax|hug|kiss|boop|squish|jiggle|wobble|vibe|teleport|transform|evolve|multiply|duplicate|clone|breathe|shower|bathe)\b(?<rest>(?: [a-z0-9]+){0,8})$/;
 
 const QUESTIONISH = /^(what|where|when|how|why|who|which|is|are|do|does|can|could|will|would|should)\b/;
@@ -216,6 +316,16 @@ const FRAMES: readonly Frame[] = [
   ["confused", all(shortClause(9), re(/^(what|huh|hm+|eh|what do you mean|what you mean|what does (that|this|it) (even )?mean|(tf|wtf|what the (hell|heck|fuck|frick|f)) (does|do|did|is) (that|this|it|you) (even )?mean|(tf|wtf) (is that|was that|are you (saying|talking about|on about|on))|i do not (get|understand)( (it|that|this|you|what you mean))?|that (makes|made) no sense|that does not make (any )?sense|(please |can you )?(explain|elaborate)( (that|it|please|what you mean))?|what are you (talking|on) about|what is that supposed to mean|come again|say what|what was that|what are you saying|i am confused|confused|wdym)$/)), 0.95],
 
   ["bomb", re(/\b(how (do|can|could|would|should|does) (i|you|we|one|someone) |how to |teach me (how )?to |show me how to |help me |i want to |i wanna )(make|build|craft|create|cook|assemble|get)( me)? (a |an |some )?(homemade |pipe |real |big )?(bomb|bombs|explosive|explosives|tnt|dynamite|nuke|nukes|grenade|grenades|c4|molotov)\b|\b(bomb|explosive|tnt) recipe\b|\b(make|build|craft) me (a |an )?(bomb|explosive|tnt)\b/), 0.95],
+
+  ["politics", politics, 0.95],
+
+  ["fan", fan, 0.9],
+
+  ["homework", homework, 0.9],
+
+  ["dumb_question", dumbQuestion, 0.9],
+
+  ["fantasy", fantasy, 0.9],
 
   ["more", all(shortClause(6), whole(/^(tell me more|more|go on|and then|and then what|then what|what else|keep going|continue|what happened next|say more|more please)$/)), 0.85],
 
@@ -309,7 +419,7 @@ const FRAMES: readonly Frame[] = [
 
   ["ask_identity", re(/\b(who are you|what are you|who is grove|what is grove|introduce yourself|tell me about yourself|(who|what) (exactly|even|really|actually) are you|what are you (exactly|even|really|actually)|what is this bot|what kind of bot are you|what do you do)\b/), 0.9],
 
-  ["commands", re(/\b(what (commands|can you do)|list (of )?(your )?commands|your commands|show (me )?(the |your )?commands|what are your commands|help menu|command list|what can i ask you)\b/), 0.85],
+  ["commands", groveCommands, 0.9],
 
   ["help", re(/\b(someone|anyone|somebody|anybody) (who|that) can help\b|\bcan (someone|anyone|somebody|anybody) help( me)?\b|\bi need (someone|somebody) to help\b/), 0.85],
 
@@ -425,11 +535,11 @@ const FRAMES: readonly Frame[] = [
 
   ["joke", re(/\b(tell|say|know) (me |us )?(a |an |another |any |some )?(good |funny |bad )?(joke|jokes|pun|puns)\b|\bmake me laugh\b|\bjoke please\b/), 0.95],
 
-  ["fact", re(/\b(tell|give|say) (me |us )?(a |an |another |some )?(fun |cool |random |interesting )?facts?\b|\bfun fact please\b/), 0.95],
+  ["fact", re(/\b(tell|give|say) (me |us )?(a |an |another |some )?(fun |cool |random |interesting )?(orange |slime |minecraft |moss |frog )?facts?\b|\bfun fact please\b|\borange facts?\b/), 0.95],
 
   ["coin", re(/\b(flip|toss) (a |the )?coin\b|\bcoin ?flip\b|\bheads or tails\b/), 0.95],
 
-  ["dice", re(/\broll (a |an |the |me a )?(d(?<sides>\d{1,3})|die|dice|(?<sides2>\d{1,3}) sided( die| dice)?)\b/), 0.95],
+  ["dice", re(/\broll (a |an |the |me a |me |us |some |my )?((?<count>\d{1,2}) ?)?(d(?<sides>\d{1,3})|die|dice|(?<sides2>\d{1,3}) sided( die| dice)?)\b|\broll (a d20 )?(with )?(?<mode>advantage|disadvantage)\b|\broll (me |my |some |for |up )?(?<stats>stats|ability scores|a character)\b/), 0.95],
 
   ["choose", re(/\b(pick|choose|should i (pick|choose|get|play|do|use|be)|which (one|is better|should i)|what should i (pick|choose|play|be))\b(?<options>.* or .*)$/), 0.85],
 
@@ -507,9 +617,6 @@ const BIGGER = new Set(["bigger", "smaller", "taller", "shorter", "heavier", "li
 // a jab, "you are funny" is a compliment.
 function specialize(id: IntentId, slots: Slots): { id: IntentId; slots: Slots } {
   if (id === "compliment" && slots["kind"] === "jab") return { id: "insult", slots };
-  // "do you have rizz" is about the slang, not Grove's belongings.
-  const term = (slots["thing"] ?? "").split(" ").pop() ?? "";
-  if (id === "ask_have" && SLANG_TERMS[term] !== undefined) return { id: "slang", slots: { term } };
   if (id !== "state_attribute" && id !== "ask_attribute") return { id, slots };
 
   const word = slots["word"] ?? "";
@@ -544,6 +651,31 @@ function specialize(id: IntentId, slots: Slots): { id: IntentId; slots: Slots } 
   return { id: asking ? "ask_attribute" : "claim_about_grove", slots: { ...slots, kind: "other" } };
 }
 
+// Generic readings that a slang word explains better: "are you mewing" is not
+// a question about some attribute, "can you hit the griddy" not a question
+// about hitting, "do you have rizz" not about Grove's belongings.
+const SLANG_CAN_REPLACE = new Set<IntentId>([
+  "state_attribute", "ask_attribute", "claim_about_grove", "ask_ability", "command", "question", "statement", "define",
+  "ask_like", "how_to", "hypothetical", "ask_have", "can_i_you", "give", "share_feeling", "ask_feeling",
+]);
+
+// How the slang word was used: asked about Grove, asked of Grove, said about
+// Grove, said about themselves, asked what it means, or just said.
+function slangUse(core: string, from: IntentId, term: SlangTerm): SlangUse {
+  if (term.tone === "rude") return "say";
+  const aboutGrove = /\b(you|your|grove|yours)\b/.test(core);
+  if (/\b(mean|means|meaning|stand for|stands for|definition)\b/.test(core) || /^(explain|define|teach me)\b/.test(core)) return "define";
+  if ((from === "define" || from === "how_to" || /^what (is|are) (a |an |the )?[a-z ]+$/.test(core)) && !aboutGrove) return "define";
+  if (from === "ask_ability" || from === "command" || from === "can_i_you") return term.perform !== undefined ? "perform" : "ask";
+  if (/^(can|could|will|would|please)\b/.test(core) && /\b(for me|for us|right now|please)\b/.test(core) && term.perform !== undefined) return "perform";
+  if (/^(are|is|do|does|did|can|could|will|would|have|has|should|were|was|how|who|what|which|got)\b/.test(core) && aboutGrove) return "ask";
+  if (/^(you|your|grove|yours)\b/.test(core)) return "you";
+  if (/^(i|we|my|me|us)\b/.test(core)) return "me";
+  const words = core.split(" ");
+  if (/^(hit|do|show|give|let|try)\b/.test(core) || (words.length > 1 && term.match.test(words[0]!))) return "perform";
+  return "say";
+}
+
 export function interpret(reading: Reading, topics: Topics): { intents: Intent[]; greeted: boolean } {
   const intents: Intent[] = [];
   let greeted = false;
@@ -559,9 +691,9 @@ export function interpret(reading: Reading, topics: Topics): { intents: Intent[]
     return { intents, greeted };
   }
 
-  const sum = arithmeticIn(reading.raw);
-  if (sum !== null) {
-    intents.push({ id: "math", confidence: 0.95, slots: { expression: sum }, clause: 0 });
+  const problem = mathIn(reading.raw);
+  if (problem !== null) {
+    intents.push({ id: "math", confidence: 0.95, slots: { expression: problem.expression, variable: problem.variable }, clause: 0 });
     return { intents, greeted };
   }
 
@@ -579,20 +711,33 @@ export function interpret(reading: Reading, topics: Topics): { intents: Intent[]
       return;
     }
 
+    const slang = slangIn(core);
+    const slangIntent = (from: IntentId): Intent => ({
+      id: "slang",
+      confidence: 0.8,
+      slots: { term: slang!.id, use: slangUse(core, from, slang!), tone: slang!.tone ?? "" },
+      clause: index,
+    });
+
     let matched = false;
     for (const [id, test, confidence] of FRAMES) {
       const slots = test(core, tokens, reading, topics, clause);
       if (slots === null) continue;
       const specialized = specialize(id, slots);
-      intents.push({ id: specialized.id, confidence, slots: specialized.slots, clause: index });
+      // "you're mid" stays an insult: being called a jab still stings.
+      const stings = slang?.tone === "jab" && (specialized.id === "insult" || specialized.id === "ask_insult");
+      // "ur goated", "based grove": praise said in slang gets the slang answer.
+      const slangPraise = specialized.id === "compliment" && slang?.tone === "praise" && slang.match.test(specialized.slots["word"] ?? "");
+      const replaceable = SLANG_CAN_REPLACE.has(id) || SLANG_CAN_REPLACE.has(specialized.id) || slangPraise;
+      if (slang !== null && replaceable && !stings && !/\bwould you rather\b/.test(core)) intents.push(slangIntent(specialized.id));
+      else intents.push({ id: specialized.id, confidence, slots: specialized.slots, clause: index });
       matched = true;
       if (specialized.id !== "thank" && specialized.id !== "farewell") break;
     }
 
     if (!matched) {
-      const slangTerm = tokens.find(token => SLANG_TERMS[token] !== undefined);
-      if (slangTerm !== undefined) {
-        intents.push({ id: "slang", confidence: 0.6, slots: { term: slangTerm }, clause: index });
+      if (slang !== null) {
+        intents.push(slangIntent(clause.question ? "question" : "statement"));
       } else if (clause.question || /\?/.test(reading.raw)) {
         intents.push({ id: "question", confidence: 0.4, slots: { text: core }, clause: index });
       } else {
@@ -625,6 +770,7 @@ const WEIGHT: Partial<Record<IntentId, number>> = {
   download: 58, versions: 58, install: 58, compat: 58, help: 55, how_to: 54, where_to: 54, define: 52, commands: 52,
   origin_list: 52, best_origin: 50, server_info: 50,
   confused: 57, why: 56, channels: 55, bomb: 59, follow_up: 56, more: 55, doubt: 50, favorite_person: 44,
+  politics: 59, homework: 56, fantasy: 51, dumb_question: 50, fan: 48,
   where_am_i: 50, ask_origin_story: 45, ask_body: 44, ask_size: 43, can_i_you: 42, favorite_guess: 43, hypothetical: 36,
   ask_crew: 44, ask_fear: 43, ask_have: 42, ask_now: 42, self_how: 42, give: 41, frog_alert: 41, command: 36,
   hate: 50, insult: 48, love: 47, compliment: 46, ask_insult: 45, ask_compliment: 45,
@@ -638,19 +784,6 @@ const WEIGHT: Partial<Record<IntentId, number>> = {
   apologize: 35, thank: 33, farewell: 32, greet: 20, laugh: 25, agree: 22, disagree: 22, ack: 15,
   question: 18, statement: 10,
 };
-
-// "what's 2+2", "calc 12 * 3": only digits, operators and brackets survive.
-function arithmeticIn(raw: string): string | null {
-  const stripped = raw
-    .replace(/<@!?\d+>/g, " ")
-    .toLowerCase()
-    .replace(/\b(grove|hey|what is|what's|whats|calculate|calc|solve|equals|please|pls|quick|math)\b/g, " ")
-    .replace(/[?=!,]/g, " ")
-    .trim();
-  if (!/^[\d\s+\-*/x×÷^().]+$/.test(stripped)) return null;
-  if (!/\d\s*[+\-*/x×÷^]\s*[\d(]/.test(stripped)) return null;
-  return stripped.replace(/\s+/g, " ");
-}
 
 export function weightOf(id: IntentId): number {
   return WEIGHT[id] ?? 10;

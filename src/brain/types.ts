@@ -36,6 +36,8 @@ export interface Decision {
   reactions: readonly string[];
   // Images from assets/ to attach to the reply, by file name.
   files: readonly string[];
+  // A !command whose output is sent instead of `text` ("help" for "what commands do you have?").
+  command: string | null;
   delayMs: number;
   // When set, the adapter waits this long and asks `stillUnanswered` before
   // speaking, so Grove only helps when no person stepped in first.
@@ -69,4 +71,6 @@ export type Expectation =
   | { kind: "problem_source" }
   | { kind: "help_topic" }
   | { kind: "yes_no"; topic: string }
-  | { kind: "name" };
+  | { kind: "name" }
+  | { kind: "homework_subject" }
+  | { kind: "dumb_answer" };

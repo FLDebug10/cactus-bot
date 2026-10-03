@@ -8,8 +8,8 @@ const set = (text: string): ReadonlySet<string> => new Set(text.trim().split(/\s
 export const INSULTS = set(`
   dumb stupid idiot idiotic moron moronic useless annoying annoyin trash garbage bad terrible awful
   horrible worst lame cringe cringy mid ugly gross disgusting weird creepy broken slow pathetic worthless
-  dense brainless clueless dumbass dummy loser boring stinky smelly mean rude evil dumbo goofy npc
-  fake sus irritating obnoxious incompetent dogwater ass shit clanker
+  dense brainless clueless dumbass dummy loser boring stinky smelly mean rude evil dumbo goofy
+  fake irritating obnoxious incompetent dogwater ass shit clanker
 `);
 
 export const COMPLIMENTS = set(`
@@ -73,7 +73,7 @@ export const ABILITIES: Readonly<Record<string, Ability>> = table({
   read: { can: true, line: "i can read! slowly. the handbook has a lot of big words" },
   write: { can: true, line: "i can write little messages like this one!" },
   count: { can: true, line: "i can count to like seven. after that it gets blurry" },
-  math: { can: true, line: "a little bit! try me with something easy" },
+  math: { can: true, line: "yep! i can't count past seven in my head, but i bounce on a calculator for the big ones. try me, like 'what's 24 divided by 5'" },
   cook: { can: false, line: "i tried cooking once and the stove got slimy. we don't talk about it" },
   draw: { can: false, line: "i can make slime trails in the shape of hearts, does that count?" },
   fight: { can: false, line: "fight? i'm made of jelly, i would just jiggle at them" },
@@ -171,14 +171,6 @@ export const DO_YOU_VERBS = set(`
 
 // "are you old?" is a question about age.
 export const AGE_WORDS = set(`old young new baby newborn ancient`);
-
-// Slang Grove recognizes on its own, with what it takes it to mean.
-export const SLANG_TERMS: Readonly<Record<string, string>> = table({
-  rizz: "rizz", sigma: "sigma", skibidi: "skibidi", ohio: "ohio", gyatt: "gyatt", mewing: "mewing",
-  bussin: "bussin", cap: "cap", nocap: "nocap", slay: "slay", based: "based", mid: "mid", goated: "goated",
-  drip: "drip", delulu: "delulu", sheesh: "sheesh", ratio: "ratio", sus: "sus", npc: "npc", aura: "aura",
-  fanum: "fanum", griddy: "griddy", yeet: "yeet", pog: "pog", poggers: "pog", w: "w", l: "l", ate: "ate",
-});
 
 export const LIKES = set(`
   moss flowers flower sun sunshine rain rainy puddles puddle water lily pad lilypad mushrooms mushroom
