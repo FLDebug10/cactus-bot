@@ -11,7 +11,7 @@ export const INFO_COMMANDS: readonly Command[] = [
     name: "rbr",
     description: "Redirect bug reports",
     run: context => answer(context, `Please use <#${CHANNELS.bugReports}> to report any bugs you encounter.
-Or you can use \`!report [Thread name] [Message] [Apoli/Origins/Wiki] [Image link if needed]\` to report it for you!
+Alternatively you can use \`!report [Thread name] [Message] [Apoli/Origins/Wiki] [Image link if needed]\` to report it for you!
 
 This helps keep bug reports organized and makes it easier to track and address issues without cluttering the main discussion channels.`),
   },
