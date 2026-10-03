@@ -1,4 +1,7 @@
 import type { Command } from "./command.ts";
+import { ChannelType } from "discord.js";
+
+const BUG_REPORT_FORUM_ID = "1533408856682663956";
 
 export const TOOL_COMMANDS: readonly Command[] = [
   {
@@ -41,6 +44,57 @@ export const TOOL_COMMANDS: readonly Command[] = [
       const escaped = args.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
       if (escaped.length > 1900) return message.reply("❌ The escaped command is too long to send in one Discord message.");
       return message.reply(`\`\`\`\n${escaped}\n\`\`\``);
+    },
+  },
+  {
+    name: "report",
+    usage: "!report [Thread name] [Message] [Image link if needed]",
+    description: "Creates a bug report",
+    run: async ({ message, args }) => {
+      const match = args.match(
+        /^\[(.+?)\]\s+\[(.+?)\](?:\s+\[(.+?)\])?$/
+      );
+
+      if (match === null) {
+        return message.reply(
+          "❌ Use: `!report [Thread name] [Message] [Image link if needed]`"
+        );
+      }
+
+      const threadName = match[1].trim();
+      const reportMessage = match[2].trim();
+      const imageLink = match[3]?.trim();
+
+      const forum = await message.client.channels
+        .fetch(BUG_REPORT_FORUM_ID)
+        .catch(() => null);
+
+      if (forum === null || forum.type !== ChannelType.GuildForum) {
+        return message.reply("❌ I couldn't find the bug report forum.");
+      }
+
+      try {
+        let content =
+          `🐛 **Bug Report**\n\n` +
+          `**Reported by:** ${message.author}\n\n` +
+          `**Description:**\n${reportMessage}`;
+
+        if (imageLink !== undefined) {
+          content += `\n\n**Image:**\n${imageLink}`;
+        }
+
+        const thread = await forum.threads.create({
+          name: threadName,
+          message: {
+            content,
+          },
+        });
+
+        return message.reply(`✅ Bug report created: ${thread}`);
+      } catch (error) {
+        console.error("Error creating bug report:", error);
+        return message.reply("❌ I couldn't create the bug report.");
+      }
     },
   },
 ];
