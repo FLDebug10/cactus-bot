@@ -6,9 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 COPY . .
 
-ENV DB_PATH=/data/db.sqlite
-VOLUME /data
-CMD ["node", "index.ts"]
+ENV NODE_ENV=production
+CMD ["node", "src/index.ts"]
