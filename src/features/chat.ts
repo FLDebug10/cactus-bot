@@ -7,15 +7,17 @@ import { addressingOf } from "../grove/addressing.ts";
 import { type BrainChain, BrainUnavailable, type ToolBox } from "../grove/brain.ts";
 import { checkedReply } from "../grove/checked.ts";
 import { History } from "../grove/history.ts";
+import type { Schema } from "../grove/knowledge/schema.ts";
 import type { KnowledgeStore } from "../grove/knowledge/store.ts";
 import { describeGifs, gifAttachment } from "../grove/links.ts";
-import { gatherNotes, type Note, notesQuery } from "../grove/notes.ts";
+import { gatherNotes, hintsOf, mainTypeOf, type Note, notesQuery } from "../grove/notes.ts";
 import { persona, rightNow } from "../grove/persona.ts";
 import { buildPrompt } from "../grove/prompt.ts";
+import { promisedLookup } from "../grove/promises.ts";
 import { asksAboutExplosives, EXPLOSIVE_LINES, explicitMatch, explicitReply, mentionsRealExplosives, TNT_RECIPE_IMAGE } from "../grove/reflexes.ts";
 import { groveTools } from "../grove/tools.ts";
 import type { Addressing, ChannelInfo, ChatLine, TextAttachment } from "../grove/types.ts";
-import { voice } from "../grove/voice.ts";
+import { splitMessage, voice } from "../grove/voice.ts";
 import { logger } from "../logger.ts";
 
 const log = logger("chat");
@@ -281,7 +283,8 @@ export class GroveChat {
       const thread = await this.threadInfo(message);
       const attachments = await readTextAttachments(message);
       const images = BRAIN.vision && this.options.brain.can("vision") ? await readImages(message) : [];
-      const notes = this.notesFor(merged, replyTo, transcript);
+      const schema = this.schema();
+      const notes = this.notesFor(merged, replyTo, transcript, schema);
 
       const prompt = buildPrompt({
         persona: this.personaText,
@@ -301,11 +304,24 @@ export class GroveChat {
         target: merged,
         replyTo,
         attachments,
+        followup: job.addressing === "followup",
       });
 
-      const knowledge = this.options.knowledge;
-      const catalog = knowledge !== null && !knowledge.isEmpty() ? knowledge.catalog() : null;
-      const reply = await checkedReply(this.options.brain, { system: prompt.system, messages: prompt.messages, images, tools: this.tools, maxToolRounds: 3, toolBudget: TOOL_CHARS }, catalog);
+      const reply = await checkedReply(
+        this.options.brain,
+        {
+          system: prompt.system,
+          messages: prompt.messages,
+          images,
+          tools: this.tools,
+          maxToolRounds: 3,
+          toolBudget: TOOL_CHARS,
+          followThrough: text => promisedLookup(text, merged.content),
+          ...prompt.sampling,
+        },
+        schema,
+        { mainType: mainTypeOf(notes), hints: hintsOf(notes) },
+      );
       for (const line of [target, ...extra]) this.covered.add(line.id);
       let text = voice(reply.text, { channels: this.channelList });
       if (text === null) {
@@ -318,10 +334,16 @@ export class GroveChat {
         return;
       }
 
-      await message.reply({ content: text, allowedMentions: { parse: [], repliedUser: false }, failIfNotExists: false });
+      // A long answer (prose and a big json block) goes out as two messages, never cut mid-json.
+      const [first, ...rest] = splitMessage(text);
+      await message.reply({ content: first!, allowedMentions: { parse: [], repliedUser: false }, failIfNotExists: false });
+      for (const more of rest) {
+        if (message.channel.isSendable()) await message.channel.send({ content: more, allowedMentions: { parse: [] } });
+      }
       this.history.noteAnswered(message.channelId, message.author.id, Date.now());
-      const tools = `${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed invented json" : ""}`;
+      const tools = `${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}`;
       log.info(`answered ${target.authorName} in ${message.channelId} with the ${reply.brain} brain (${job.addressing}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${tools})`);
+      if (reply.problems.length > 0) log.info(`its first json had: ${reply.problems.join(" | ")}`);
     } finally {
       stopTyping();
     }
@@ -368,12 +390,18 @@ export class GroveChat {
     return info;
   }
 
+  // What exists in the mods, for the notes and for checking the json in a reply. null before the first sync.
+  private schema(): Schema | null {
+    const knowledge = this.options.knowledge;
+    return knowledge === null || knowledge.isEmpty() ? null : knowledge.schema(CODE_SOURCES);
+  }
+
   // What the library says about the message, read before the brain answers.
   // null when the message isn't about the mods (or there is no library yet).
-  private notesFor(target: ChatLine, replyTo: ChatLine | null, transcript: readonly ChatLine[]): Note[] | null {
+  private notesFor(target: ChatLine, replyTo: ChatLine | null, transcript: readonly ChatLine[], schema: Schema | null): Note[] | null {
     const knowledge = this.options.knowledge;
     if (knowledge === null || knowledge.isEmpty()) return null;
-    return gatherNotes(knowledge, notesQuery(target, replyTo, transcript), { codeSources: CODE_SOURCES });
+    return gatherNotes(knowledge, notesQuery(target, replyTo, transcript), { codeSources: CODE_SOURCES, ...(schema !== null ? { schema } : {}) });
   }
 
   // The message as plain text: "@name" for mentions, "#name" for channels, ":name:" for emoji.

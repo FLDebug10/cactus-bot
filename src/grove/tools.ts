@@ -8,6 +8,7 @@ import { mathIn, solveMath, spokenValue } from "./arithmetic.ts";
 import type { ToolBox } from "./brain.ts";
 import { rollDice } from "./dice.ts";
 import type { KnowledgeStore, SearchHit } from "./knowledge/store.ts";
+import { condensePage } from "./notes.ts";
 
 const MAX_RESULT = 3_500;
 const NOT_READY = "grove's library is still downloading (it syncs from github after a restart). answer from what you know, and say so if you're not sure.";
@@ -25,8 +26,8 @@ export const TOOL_DEFINITIONS: Tool[] = [
   ),
   tool(
     "read_handbook_page",
-    "Read a whole Handbook page when a search result looks right but you need every field, default or the example.",
-    { page: { type: "string", description: "The page link or title from search_handbook" } },
+    "Read a Handbook page: what the type does, every field with its default, and the page's examples. Use it for a type id you know (\"apoli:action_on_hit\") or a search result.",
+    { page: { type: "string", description: "A type id like \"apoli:action_on_hit\", or the page link or title from search_handbook" } },
     ["page"],
   ),
   tool(
@@ -134,7 +135,7 @@ export function groveTools(knowledge: KnowledgeStore | null, random: () => numbe
         case "read_handbook_page": {
           if (!ready()) return NOT_READY;
           const page = knowledge!.page(asString(args["page"]));
-          return page === null ? "no page like that. search_handbook first." : clip(`${page.title}\n${page.url}\n\n${page.text}`);
+          return page === null ? "no page like that. search_handbook first." : `${page.title}\n${page.url}\n\n${condensePage(page.text, MAX_RESULT - 200, 3)}`;
         }
         case "search_source": {
           if (!ready()) return NOT_READY;

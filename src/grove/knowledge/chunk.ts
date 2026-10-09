@@ -97,12 +97,12 @@ function handbookFile(source: KnowledgeSource, path: string, raw: string): Prepa
 
   const title = meta.get("title") ?? /^#\s+(.+)$/m.exec(body)?.[1] ?? path;
   const description = meta.get("description") ?? "";
-  const typeId = /Type ID:\s*`([^`]+)`/.exec(body)?.[1] ?? "";
-  const aliases = (meta.get("aliases") ?? "").replace(/[[\]"]/g, " ");
+  const typeId = TYPE_ID.exec(body)?.[1] ?? "";
+  const aliases = [...(meta.get("aliases") ?? "").matchAll(/"([^"]+)"/g)].map(match => match[1]!);
   const fileWords = path.split("/").pop()!.replace(/\.md$/, "").replace(/[-_]/g, " ");
-  const keywords = [typeId, typeId.replace(/[:_]/g, " "), aliases, fileWords, description].join(" ").replace(/\s+/g, " ").trim();
+  const keywords = [typeId, typeId.replace(/[:_]/g, " "), ...aliases, fileWords, description].join(" ").replace(/\s+/g, " ").trim();
 
-  const text = body.trim();
+  const text = withAliases(body.trim(), typeId, aliases);
   const chunks: ChunkRecord[] = [];
   const sections = text.split(/\n(?=## )/);
   let line = 1;
@@ -116,6 +116,20 @@ function handbookFile(source: KnowledgeSource, path: string, raw: string): Prepa
     }
   }
   return { file: { source: source.name, path, title, url, text }, chunks };
+}
+
+const TYPE_ID = /Type ID:\**\s*`([^`]+)`/;
+
+// The legacy ids a type still answers to live in the page's frontmatter, which
+// isn't kept, so they go under its Type ID line: "Also answers to: `apoli:active_self`".
+function withAliases(text: string, typeId: string, aliases: readonly string[]): string {
+  const line = TYPE_ID.exec(text);
+  if (line === null || aliases.length === 0 || !typeId.includes(":")) return text;
+  const namespace = typeId.slice(0, typeId.indexOf(":"));
+  const ids = aliases.map(alias => `\`${alias.includes(":") ? alias : `${namespace}:${alias}`}\``).join(", ");
+  const end = text.indexOf("\n", line.index);
+  const at = end === -1 ? text.length : end;
+  return `${text.slice(0, at)}\n\nAlso answers to: ${ids}${text.slice(at)}`;
 }
 
 // Long sections split on blank lines, never inside a code fence.

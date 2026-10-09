@@ -19,13 +19,14 @@ import { History } from "../src/grove/history.ts";
 import { KnowledgeStore } from "../src/grove/knowledge/store.ts";
 import { KnowledgeSync } from "../src/grove/knowledge/sync.ts";
 import { describeGifs } from "../src/grove/links.ts";
-import { gatherNotes, type Note, notesQuery } from "../src/grove/notes.ts";
+import { gatherNotes, hintsOf, mainTypeOf, type Note, notesQuery } from "../src/grove/notes.ts";
 import { persona, rightNow } from "../src/grove/persona.ts";
 import { buildPrompt } from "../src/grove/prompt.ts";
+import { promisedLookup } from "../src/grove/promises.ts";
 import { asksAboutExplosives, explicitMatch, explicitReply } from "../src/grove/reflexes.ts";
 import { groveTools } from "../src/grove/tools.ts";
 import type { ChannelInfo, ChatLine } from "../src/grove/types.ts";
-import { voice } from "../src/grove/voice.ts";
+import { splitMessage, voice } from "../src/grove/voice.ts";
 import { logger } from "../src/logger.ts";
 
 const CHANNEL = "terminal";
@@ -87,7 +88,8 @@ async function handle(input: string): Promise<boolean> {
     return false;
   }
 
-  lastNotes = knowledge.isEmpty() ? null : gatherNotes(knowledge, notesQuery(target, null, transcript), { codeSources: codeSourcesOf(MAIN_BUILD) });
+  const schema = knowledge.isEmpty() ? null : knowledge.schema(codeSourcesOf(MAIN_BUILD));
+  lastNotes = schema === null ? null : gatherNotes(knowledge, notesQuery(target, null, transcript), { codeSources: codeSourcesOf(MAIN_BUILD), schema });
   const prompt = buildPrompt({
     persona: personaText,
     moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0, gif: target.content.includes("[gif") }),
@@ -99,11 +101,17 @@ async function handle(input: string): Promise<boolean> {
   });
   try {
     await brain.check();
-    const reply = await checkedReply(brain, { system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3, toolBudget: 4_000 }, knowledge.isEmpty() ? null : knowledge.catalog());
+    const reply = await checkedReply(
+      brain,
+      { system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3, toolBudget: 4_000, followThrough: text => promisedLookup(text, target.content), ...prompt.sampling },
+      schema,
+      { mainType: mainTypeOf(lastNotes), hints: hintsOf(lastNotes) },
+    );
     const text = voice(reply.text, { channels }) ?? "(stays quiet)";
     history.add(line("grove", text, true));
-    console.log(`grove: ${text}`);
-    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed invented json" : ""}]`);
+    console.log(splitMessage(text).map(piece => `grove: ${piece}`).join("\n  [next message]\n"));
+    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}]`);
+    for (const problem of reply.problems) console.log(`  [first json: ${problem}]`);
   } catch (error) {
     console.log(`  (the brain didn't answer: ${error instanceof Error ? error.message : String(error)})`);
   } finally {

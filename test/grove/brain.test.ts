@@ -3,16 +3,19 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
 import { Brain, BrainChain, type BrainOptions, BrainUnavailable } from "../../src/grove/brain.ts";
+import { promisedLookup } from "../../src/grove/promises.ts";
 import type { Logger } from "../../src/logger.ts";
 
 const quiet: Logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
 
 interface Scenario {
   models: Record<string, { capabilities: string[]; thinking?: { values: unknown[] } }>;
-  chat: "tool-then-answer" | "answer" | "rate-limited";
+  chat: "tool-then-answer" | "promise-then-answer" | "answer" | "rate-limited";
   balance: unknown | null;
   answer: string;
 }
+
+const PROMISE = "got it! let's look at `apoli:action_on_hit` for that. i'll pull up the handbook page so we can see how it works.";
 
 interface Seen {
   tools: boolean;
@@ -53,7 +56,9 @@ async function fakeOllama(scenario: Scenario): Promise<{ url: string; seen: Seen
       const usedTool = messages.some(message => message.role === "tool");
       const message = scenario.chat === "answer" || usedTool
         ? { role: "assistant", content: scenario.answer }
-        : { role: "assistant", content: "", tool_calls: [{ function: { name: "search_handbook", arguments: { query: "resource" } } }] };
+        : scenario.chat === "promise-then-answer"
+          ? { role: "assistant", content: PROMISE }
+          : { role: "assistant", content: "", tool_calls: [{ function: { name: "search_handbook", arguments: { query: "resource" } } }] };
       return json(response, 200, { model: "x", created_at: new Date().toISOString(), message, done: true, prompt_eval_count: 100, eval_count: 5 });
     }
     json(response, 404, { error: "no" });
@@ -67,6 +72,12 @@ const brain = (options: Partial<BrainOptions> & { url: string; model: string; na
 
 let local: Awaited<ReturnType<typeof fakeOllama>>;
 let cloud: Awaited<ReturnType<typeof fakeOllama>>;
+const localScenario: Scenario = {
+  models: { "grove-test": { capabilities: ["completion", "tools", "thinking"], thinking: { values: [true, false] } } },
+  chat: "tool-then-answer",
+  balance: null,
+  answer: "the max is 10!",
+};
 const cloudScenario: Scenario = {
   models: { "glm-5.3-flash": { capabilities: ["completion", "tools", "thinking"], thinking: { values: ["low", "high", "max"] } } },
   chat: "answer",
@@ -75,12 +86,7 @@ const cloudScenario: Scenario = {
 };
 
 before(async () => {
-  local = await fakeOllama({
-    models: { "grove-test": { capabilities: ["completion", "tools", "thinking"], thinking: { values: [true, false] } } },
-    chat: "tool-then-answer",
-    balance: null,
-    answer: "the max is 10!",
-  });
+  local = await fakeOllama(localScenario);
   cloud = await fakeOllama(cloudScenario);
 });
 
@@ -131,6 +137,44 @@ describe("brain", () => {
     assert.equal(last.tools, false);
     assert.equal(last.messages[last.messages.length - 1]?.role, "user");
     assert.match(last.messages[last.messages.length - 1]?.content ?? "", /can't look anything else up[^]*Don't say you'll check/);
+  });
+
+  it("does the lookup a reply only promised, then asks for the answer itself", async () => {
+    localScenario.chat = "promise-then-answer";
+    const grove = brain({ url: local.url, model: "grove-test" });
+    await grove.check();
+    grove.stop();
+    const ran: string[] = [];
+    const reply = await grove.reply({
+      system: "you are grove",
+      messages: [{ role: "user", content: "sam: how do i do something when i hit an entity?" }],
+      tools: { definitions: [], run: async (name, args) => (ran.push(`${name}:${String(args["page"])}`), "Action On Hit (Power Type)\nType ID: `apoli:action_on_hit`") },
+      followThrough: text => promisedLookup(text, "how do i do something when i hit an entity?"),
+      temperature: 0.5,
+      presencePenalty: 0,
+    });
+    localScenario.chat = "tool-then-answer";
+    assert.equal(reply.text, "the max is 10!");
+    assert.deepEqual(ran, ["read_handbook_page:apoli:action_on_hit"]);
+    assert.deepEqual(reply.toolCalls, ["read_handbook_page"]);
+    const last = local.seen[local.seen.length - 1]!;
+    assert.equal(last.tools, false, "the answer is asked for without tools, so it can't promise again");
+    assert.deepEqual(last.messages.slice(-3).map(message => message.role), ["assistant", "tool", "user"]);
+    assert.equal(last.messages[last.messages.length - 3]?.content, PROMISE);
+    assert.match(last.messages[last.messages.length - 1]?.content ?? "", /^\(That's what the lookup found\./);
+    assert.equal(last.options?.["temperature"], 0.5);
+    assert.equal(last.options?.["presence_penalty"], 0);
+  });
+
+  it("sends a promise as it is when there's nothing to follow through with", async () => {
+    localScenario.chat = "promise-then-answer";
+    const grove = brain({ url: local.url, model: "grove-test" });
+    await grove.check();
+    grove.stop();
+    const reply = await grove.reply({ system: "s", messages: [{ role: "user", content: "hi" }] });
+    localScenario.chat = "tool-then-answer";
+    assert.equal(reply.text, PROMISE);
+    assert.equal(local.seen[local.seen.length - 1]?.options?.["presence_penalty"], undefined, "the model's own penalty stays for chat");
   });
 
   it("stays offline when the model isn't pulled", async () => {

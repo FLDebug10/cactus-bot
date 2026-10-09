@@ -6,8 +6,9 @@ import { describe, it } from "node:test";
 import Database from "better-sqlite3";
 import type { KnowledgeSource } from "../../src/config.ts";
 import { type ChunkRecord, type FileRecord, prepare } from "../../src/grove/knowledge/chunk.ts";
+import { conceptHints, conceptPages } from "../../src/grove/knowledge/concepts.ts";
 import { ftsQuery, KnowledgeStore } from "../../src/grove/knowledge/store.ts";
-import { codeOnly, colorHints, condensePage, gatherNotes, isModQuestion, notesQuery } from "../../src/grove/notes.ts";
+import { codeOnly, colorHints, compactTables, condensePage, gatherNotes, isModQuestion, mainTypeOf, notesQuery } from "../../src/grove/notes.ts";
 import type { ChatLine } from "../../src/grove/types.ts";
 
 const HANDBOOK: KnowledgeSource = { name: "handbook", repo: "0vergrown/Handbook", branch: "main", kind: "docs" };
@@ -166,13 +167,21 @@ describe("what Grove reads before answering", () => {
     assert.match(notesQuery(line("6", "fld", "what is this"), line("7", "sam", "my cooldown power is broken"), []), /cooldown power is broken/);
   });
 
-  it("keeps a page's fields and first example and drops the rest and the link markup", () => {
+  it("keeps a page's fields, one line each, and its first example, and drops the rest and the link markup", () => {
     const body = condensePage(FOG_PAGE.replace(/^---[\s\S]*?---\n/, ""), 2_600);
     assert.match(body, /Type ID: `apoli:modify_fog`/);
-    assert.match(body, /\| `s` \| Float \| _optional_ \| Fog start distance in blocks\. \|/);
-    assert.match(body, /"s": 0, "v": 4/);
-    assert.doesNotMatch(body, /How several powers combine|not needed|"r": 1|\]\(/);
+    assert.match(body, /^- `s` \(Float, optional\): Fog start distance in blocks\.$/m);
+    assert.match(body, /Example: Near-blindness\n```json\n\{ "type": "apoli:modify_fog", "s": 0, "v": 4 \}\n```/);
+    assert.doesNotMatch(body, /How several powers combine|not needed|"r": 1|\]\(|\| --- \|/);
+    assert.match(condensePage(FOG_PAGE.replace(/^---[\s\S]*?---\n/, ""), 2_600, 2), /"r": 1/, "more examples when asked for");
     assert.ok(condensePage("x".repeat(5_000), 600).length <= 610);
+  });
+
+  it("turns padded tables into lines, and leaves code alone", () => {
+    const table = "| Field    | Type  | Default    | Description   |\n| -------- | ----- | ---------- | ------------- |\n| `amount` | Float | _optional_ | How much.     |\n| `id`     | Identifier | — | Which one. |\n| `key` | Key | **required** | The key. |\n| `cooldown` | Integer | `1` | Ticks between, for `entity_action` and _all_ others. |";
+    assert.equal(compactTables(table), "- `amount` (Float, optional): How much.\n- `id` (Identifier): Which one.\n- `key` (Key, required): The key.\n- `cooldown` (Integer, default `1`): Ticks between, for `entity_action` and all others.");
+    assert.equal(compactTables("```json\n{ \"a\": \"x | y\" }\n```"), "```json\n{ \"a\": \"x | y\" }\n```");
+    assert.equal(compactTables("| Legacy ID | Runs on |\n|---|---|\n| `apoli:x` | the actor |"), "- `apoli:x` · the actor");
   });
 
   it("strips package and import lines from Java", () => {
@@ -189,14 +198,14 @@ describe("what Grove reads before answering", () => {
     assert.match(colorHints("0xFF0000")?.body ?? "", /rgb\(255, 0, 0\) = 1, 0, 0 /);
   });
 
-  it("finds the power page and the class behind it for a request", () => {
+  it("finds the power page for a request, and leaves the Java out unless they ask about code", () => {
     const store = indexed();
     const notes = gatherNotes(store, "can you make me a power that gives a 8, 24 block fog to the entity?");
     assert.ok(notes);
     assert.equal(notes[0]?.title, "Modify Fog (Power Type)");
     assert.equal(notes[0]?.url, "https://0vergrown.github.io/Handbook/docs/datapack/powers/modify_fog/");
-    assert.match(notes[1]?.url ?? "", /Fabric-1\.21\.1\/src\/main\/java\/.+\/ModifyFogPower\.java$/);
-    assert.match(notes[1]?.body ?? "", /^```java\npublic final class ModifyFogPower/);
+    assert.ok(!notes.some(note => note.body.startsWith("```java")), notes.map(note => note.title).join(" | "));
+    assert.equal(mainTypeOf(notes), "apoli:modify_fog");
     store.close();
   });
 
@@ -205,11 +214,25 @@ describe("what Grove reads before answering", () => {
     const notes = gatherNotes(store, "how do i make a player smaller");
     assert.ok(notes);
     assert.equal(notes[0]?.title, "Scale (Power Type)");
-    assert.match(notes[1]?.url ?? "", /ScalePower\.java$/);
     const titles = notes.map(note => note.title);
     assert.ok(titles.indexOf("Scale (Entity Action Type)") > 0, "the action page comes after the power");
     assert.ok(!titles.some(title => /Overlay|Scales that actually/.test(title)), titles.join(" | "));
     assert.ok(gatherNotes(store, "what changed about scale in the new update")?.some(note => /Scales that actually/.test(note.title)), "news questions get the news");
+    store.close();
+  });
+
+  it("reads the pages of what a question describes and names, before what a search finds", () => {
+    const store = indexed();
+    const named = gatherNotes(store, "how does apoli:modify_fog compare to a scale power", { schema: store.schema(["apoli"]) });
+    assert.equal(named?.[0]?.title, "Modify Fog (Power Type)", "an id they wrote comes first");
+    assert.deepEqual(conceptPages("make a power that heals me 1 heart every 5 seconds while i'm in water"), ["powers/action_over_time", "entity-actions/heal", "entity-conditions/submerged_in", "entity-conditions/fluid_height"]);
+    assert.deepEqual(conceptPages("can i make a power that only works at night?"), ["entity-conditions/daytime", "entity-conditions/time_of_day"]);
+    assert.deepEqual(conceptPages("make me a power that sets mobs on fire when i hit them"), ["powers/action_on_hit", "entity-actions/set_on_fire"]);
+    assert.deepEqual(conceptPages("how do i make my own origin?"), ["origins/overview", "origins/layers"]);
+    assert.deepEqual(conceptPages("grove what is your favorite color"), []);
+    assert.deepEqual(conceptHints("can i make a power that only works at night?"), ['Only at night: give the power "condition": { "type": "apoli:daytime", "inverted": true }. Every power can take a "condition".']);
+    assert.match(conceptHints("heal me every 5 seconds").join("\n"), /20 ticks = 1 second, so every 5 seconds is "interval": 100[^]*2 = one heart/);
+    assert.equal(gatherNotes(store, "make a power that only works at night")?.[0]?.title, "How this is usually done");
     store.close();
   });
 

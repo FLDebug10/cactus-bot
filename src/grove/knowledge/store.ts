@@ -5,8 +5,8 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { buildCatalog, type Catalog, type CatalogFile } from "./catalog.ts";
 import type { ChunkRecord, FileRecord } from "./chunk.ts";
+import { buildSchema, type Schema, type SchemaPage } from "./schema.ts";
 import { applySynonyms } from "./synonyms.ts";
 
 export interface SearchHit {
@@ -46,6 +46,9 @@ export interface SearchOptions {
 
 // Stemming, so "entitys", "entities" and "entity" are one word, and "invisible" finds "invisibility".
 const TOKENIZER = "porter unicode61 remove_diacritics 2";
+// Bumped whenever files are indexed differently (2: pages keep their legacy ids). An older
+// index is thrown away at open and downloaded again by the next sync.
+const INDEX_VERSION = 2;
 
 const SCHEMA = `
   CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
@@ -147,18 +150,18 @@ export class KnowledgeStore {
   private readonly filesLike;
   private readonly classStatement;
   private readonly sourceStatement;
-  private catalogCache: Catalog | null = null;
+  private schemaCache: { key: string; schema: Schema } | null = null;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
-    // An index built without stemming is thrown away and downloaded again by the next sync.
-    const existing = this.db.prepare("SELECT sql FROM sqlite_master WHERE name = 'chunks'").get() as { sql: string } | undefined;
-    const outdated = existing !== undefined && !existing.sql.includes("porter");
-    if (outdated) this.db.exec("DROP TABLE chunks");
+    const existing = this.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'sources'").get() !== undefined;
+    if (existing && (this.db.pragma("user_version", { simple: true }) as number) < INDEX_VERSION) {
+      this.db.exec("DROP TABLE IF EXISTS chunks; DROP TABLE IF EXISTS files; DROP TABLE IF EXISTS sources;");
+    }
     this.db.exec(SCHEMA);
-    if (outdated) this.db.exec("DELETE FROM sources");
+    this.db.pragma(`user_version = ${INDEX_VERSION}`);
     this.searchStatement = this.db.prepare(`
       SELECT title, body, snippet(chunks, 2, '', '', ' … ', 28) AS snip, bm25(chunks, 6.0, 3.0, 1.0) AS score, source, kind, path, url, start_line, end_line
       FROM chunks
@@ -190,7 +193,7 @@ export class KnowledgeStore {
       VALUES (@title, @keywords, @body, @source, @kind, @path, @url, @startLine, @endLine)
     `);
     const insertFile = this.db.prepare("INSERT OR REPLACE INTO files (source, path, title, url, text) VALUES (@source, @path, @title, @url, @text)");
-    this.catalogCache = null;
+    this.schemaCache = null;
     const swap = this.db.transaction(() => {
       this.db.prepare("DELETE FROM chunks WHERE source = ?").run(name);
       this.db.prepare("DELETE FROM files WHERE source = ?").run(name);
@@ -307,15 +310,23 @@ export class KnowledgeStore {
     return rows.find(row => row.source !== "handbook") ?? null;
   }
 
-  // Every type id and documented field name, for checking what Grove writes. Read from
-  // the library once and kept until the next sync changes it.
-  catalog(): Catalog {
-    if (this.catalogCache === null) {
-      const docs = this.db.prepare("SELECT path, text FROM files WHERE source = 'handbook'").all() as CatalogFile[];
-      const code = (this.db.prepare("SELECT path FROM files WHERE source != 'handbook'").all() as Array<{ path: string }>).map(row => row.path);
-      this.catalogCache = buildCatalog(docs, code);
+  // Every type id by kind, with its documented fields and examples, for checking
+  // what Grove writes: the Handbook's pages plus the registration code of the
+  // given sources (the main build of each mod). Read once and kept until the
+  // next sync changes the library.
+  schema(codeSources: readonly string[]): Schema {
+    const key = codeSources.join(",");
+    if (this.schemaCache?.key !== key) {
+      const pages = this.db.prepare("SELECT path, title, url, text FROM files WHERE source = 'handbook' AND path LIKE 'src/content/docs/%'").all() as SchemaPage[];
+      const code = this.db
+        .prepare("SELECT source, path, text FROM files WHERE source IN (SELECT value FROM json_each(?)) AND path LIKE '%.java'")
+        .all(JSON.stringify(codeSources)) as Array<{ source: string; path: string; text: string }>;
+      const sources = code.map(row => ({ namespace: row.source.split("-")[0]!, path: row.path, text: row.text }));
+      const links = (this.db.prepare("SELECT url FROM files").all() as Array<{ url: string }>).map(row => row.url);
+      const data = this.db.prepare("SELECT path, text FROM files WHERE source IN (SELECT value FROM json_each(?)) AND path LIKE 'src/main/resources/data/%'").all(JSON.stringify(codeSources)) as Array<{ path: string; text: string }>;
+      this.schemaCache = { key, schema: buildSchema(pages, sources, { links, data }) };
     }
-    return this.catalogCache;
+    return this.schemaCache.schema;
   }
 
   // The Java file of a class by its exact name ("ModifyFogPower"), in one source.

@@ -94,6 +94,21 @@ describe("prompt", () => {
     assert.match(prompt.system, /\nColors in their message\n#8f0f99 = rgb\(143, 15, 153\)/);
   });
 
+  it("says on their message that the looking up is done, and samples help more carefully than chat", () => {
+    const notes = [{ title: "Action On Hit (Power Type)", url: "u", body: "Type ID: `apoli:action_on_hit`" }];
+    const base = { persona: "P", moment: "M", transcript: [], replyTo: null, attachments: [] };
+    const last = (prompt: { messages: Array<{ content: string }> }) => prompt.messages[prompt.messages.length - 1]?.content ?? "";
+    const help = buildPrompt({ ...base, notes, target: line("1", "sam", "can u give me an example", 1) });
+    assert.equal(last(help), "sam: can u give me an example\n\n[note to grove: your REFERENCE NOTES already have the handbook pages for this. answer it now from them, with json built from the page's example, and link the page you used.]");
+    assert.deepEqual(help.sampling, { temperature: 0.5, presencePenalty: 0 });
+    assert.match(last(buildPrompt({ ...base, notes, target: line("1", "sam", "what does it do", 1) })), /answer it now from them, and link the page you used\.\]$/);
+    assert.match(last(buildPrompt({ ...base, notes, target: line("1", "sam", "where is the java class for this", 1) })), /already have the code for this\. answer it now from them, name the java file and link it\.\]$/);
+    assert.match(last(buildPrompt({ ...base, notes, followup: true, target: line("1", "sam", "what does it do", 1) })), /\[note to grove: if this is for you, your REFERENCE NOTES/);
+    const chat = buildPrompt({ ...base, notes: null, target: line("1", "sam", "hi grove", 1) });
+    assert.equal(last(chat), "sam: hi grove");
+    assert.deepEqual(chat.sampling, {});
+  });
+
   it("tells the model to look things up when the library had nothing, and says nothing for other chat", () => {
     const base = { persona: "P", moment: "M", transcript: [], target: line("1", "sam", "hi", 1), replyTo: null, attachments: [] };
     assert.match(buildPrompt({ ...base, notes: [] }).system, /Nothing in the library matched[^]*search_handbook/);

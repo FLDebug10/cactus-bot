@@ -4,7 +4,7 @@
 // Each part has a budget so the whole thing fits the model's context.
 
 import type { Message } from "ollama";
-import type { Note } from "./notes.ts";
+import { type Note, wantsSource } from "./notes.ts";
 import type { ChatLine, TextAttachment } from "./types.ts";
 
 export interface PromptInput {
@@ -19,12 +19,20 @@ export interface PromptInput {
   attachments: readonly TextAttachment[];
   // Characters for the conversation, the notes and attached files.
   budget?: { transcript?: number; notes?: number; attachments?: number };
+  // A follow-up may be for someone else, so it isn't told to answer.
+  followup?: boolean;
 }
 
 export interface Prompt {
   system: string;
   messages: Message[];
+  // How to sample the reply. Answers about the mods are written cooler and without
+  // the model's presence penalty, which pushes it away from repeating "type" and
+  // "apoli:", the very tokens JSON is made of. Chat keeps the livelier defaults.
+  sampling: { temperature?: number; presencePenalty?: number };
 }
+
+const HELP_SAMPLING = { temperature: 0.5, presencePenalty: 0 } as const;
 
 const LINE_MAX = 600;
 const NOTE_MAX = 2_800;
@@ -56,7 +64,18 @@ function notesBlock(notes: readonly Note[] | null, budget: number): string {
     parts.push(part);
     used += part.length;
   }
-  return `\n\nREFERENCE NOTES (the real Handbook pages and Apoli/Origins source that match their message. Build your answer from them: copy type ids and field names exactly, and never invent one that isn't here. If they don't cover the question, call search_handbook or search_source yourself instead of guessing)\n\n${parts.join("\n\n---\n\n")}`;
+  return `\n\nREFERENCE NOTES (already looked up for their message: the real Handbook pages, and code where it helps. Answer from them now. Copy type ids and field names exactly, build json from a page's example, and never use a type or field that isn't here. If they don't cover the question, call search_handbook or search_source before you answer)\n\n${parts.join("\n\n---\n\n")}`;
+}
+
+const WANTS_JSON = /\b(?:examples?|json|make|create|write|build|give me|power that|how (?:do|would|can|could) (?:i|you|we)|how to)\b/i;
+
+// Said on their message, where a small model looks hardest: the looking up is done, answer.
+function answerNote(notes: readonly Note[] | null, question: string, followup: boolean): string {
+  if (notes === null || notes.length === 0) return "";
+  const when = followup ? "if this is for you, " : "";
+  if (wantsSource(question)) return `\n\n[note to grove: ${when}your REFERENCE NOTES already have the code for this. answer it now from them, name the java file and link it.]`;
+  const json = WANTS_JSON.test(question) ? ", with json built from the page's example" : "";
+  return `\n\n[note to grove: ${when}your REFERENCE NOTES already have the handbook pages for this. answer it now from them${json}, and link the page you used.]`;
 }
 
 function attachmentBlock(attachments: readonly TextAttachment[], budget: number): string {
@@ -118,7 +137,7 @@ export function buildPrompt(input: PromptInput): Prompt {
   const content = target.content.trim().length === 0 ? "(no text)" : squash(target.content, 2_000);
   messages.push({
     role: "user",
-    content: `${label(target, known)}: ${content}${attachmentBlock(input.attachments, budget.attachments)}`,
+    content: `${label(target, known)}: ${content}${attachmentBlock(input.attachments, budget.attachments)}${answerNote(input.notes, target.content, input.followup === true)}`,
   });
-  return { system, messages };
+  return { system, messages, sampling: input.notes !== null ? HELP_SAMPLING : {} };
 }

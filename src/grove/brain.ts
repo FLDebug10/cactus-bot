@@ -61,6 +61,12 @@ export interface BrainRequest {
   // answer with what it has, so the prompt never outgrows the context.
   toolBudget?: number;
   maxTokens?: number;
+  // When a reply only promises a lookup ("let me check the handbook"), the lookup
+  // it promised. Grove runs it for the model once and asks for the answer again.
+  followThrough?: (reply: string) => { name: string; arguments: Record<string, unknown> } | null;
+  // Sampling for this reply. Unset: 0.7, and the model's own presence penalty.
+  temperature?: number;
+  presencePenalty?: number;
 }
 
 export interface BrainReply {
@@ -82,6 +88,8 @@ const CREDITS_RECHECK_MS = 5 * 60_000;
 const PROBE_TIMEOUT_MS = 6_000;
 // Said to the model once its lookups are used up, so it answers instead of promising to check.
 const WRAP_UP = "(You can't look anything else up now. Answer them with what the notes and your lookups showed. If that doesn't cover it, say you're not sure and point them to the support channel or the Handbook. Don't say you'll check.)";
+// Said after Grove did the lookup the model only promised.
+const FOLLOW_THROUGH = "(That's what the lookup found. Now write your actual reply to them from it, in this message: answer the question, with a json example if it fits. Don't say you'll look, check or pull anything up, it's done.)";
 const DEFAULT_REST_MS = 15 * 60_000;
 
 function withTimeout(base: typeof fetch, ms: number): typeof fetch {
@@ -313,10 +321,25 @@ export class Brain {
     let toolChars = 0;
     let promptTokens = 0;
     let replyTokens = 0;
+    let followedThrough = false;
+
+    const runTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
+      toolCalls.push(name);
+      let result: string;
+      try {
+        result = await request.tools!.run(name, args);
+      } catch (error) {
+        result = `the tool failed: ${message(error)}`;
+      }
+      const room = Math.max(300, toolBudget - toolChars);
+      const clipped = result.length > room ? `${result.slice(0, room)}\n…(cut)` : result;
+      toolChars += clipped.length;
+      return clipped;
+    };
 
     for (let round = 0; ; round++) {
-      const offerTools = useTools && round < maxRounds && toolChars < toolBudget;
-      if (useTools && !offerTools && toolCalls.length > 0 && messages[messages.length - 1]?.role === "tool") {
+      const offerTools = useTools && !followedThrough && round < maxRounds && toolChars < toolBudget;
+      if (useTools && !offerTools && !followedThrough && toolCalls.length > 0 && messages[messages.length - 1]?.role === "tool") {
         messages.push({ role: "user", content: WRAP_UP });
       }
       let response;
@@ -331,9 +354,10 @@ export class Brain {
           options: {
             num_ctx: this.options.contextTokens,
             num_predict: request.maxTokens ?? 700,
-            temperature: 0.7,
+            temperature: request.temperature ?? 0.7,
             top_p: 0.8,
             top_k: 20,
+            ...(request.presencePenalty !== undefined ? { presence_penalty: request.presencePenalty } : {}),
             ...(this.options.draftTokens !== undefined && this.options.draftTokens !== null ? { draft_num_predict: this.options.draftTokens } : {}),
           },
         });
@@ -344,24 +368,28 @@ export class Brain {
       promptTokens += response.prompt_eval_count ?? 0;
       replyTokens += response.eval_count ?? 0;
       const calls = response.message.tool_calls ?? [];
+      const text = response.message.content ?? "";
       if (!offerTools || calls.length === 0) {
-        return { text: response.message.content ?? "", brain: this.name, model: this.options.model, toolCalls, promptTokens, replyTokens, ms: this.now() - started };
+        // A promise to look something up instead of an answer: do the lookup, then ask again.
+        const promised = followedThrough || request.tools === undefined ? null : request.followThrough?.(text) ?? null;
+        if (promised !== null) {
+          followedThrough = true;
+          const result = await runTool(promised.name, promised.arguments);
+          if (useTools) {
+            messages.push({ role: "assistant", content: text, tool_calls: [{ function: { name: promised.name, arguments: promised.arguments } }] });
+            messages.push({ role: "tool", content: result, tool_name: promised.name });
+          } else {
+            messages.push({ role: "assistant", content: text }, { role: "user", content: `(${promised.name} found:)\n${result}` });
+          }
+          messages.push({ role: "user", content: FOLLOW_THROUGH });
+          continue;
+        }
+        return { text, brain: this.name, model: this.options.model, toolCalls, promptTokens, replyTokens, ms: this.now() - started };
       }
 
-      messages.push({ role: "assistant", content: response.message.content ?? "", tool_calls: calls });
+      messages.push({ role: "assistant", content: text, tool_calls: calls });
       for (const call of calls.slice(0, 4)) {
-        const name = call.function.name;
-        toolCalls.push(name);
-        let result: string;
-        try {
-          result = await request.tools!.run(name, call.function.arguments ?? {});
-        } catch (error) {
-          result = `the tool failed: ${message(error)}`;
-        }
-        const room = Math.max(300, toolBudget - toolChars);
-        const clipped = result.length > room ? `${result.slice(0, room)}\n…(cut)` : result;
-        toolChars += clipped.length;
-        messages.push({ role: "tool", content: clipped, tool_name: name });
+        messages.push({ role: "tool", content: await runTool(call.function.name, call.function.arguments ?? {}), tool_name: call.function.name });
       }
     }
   }

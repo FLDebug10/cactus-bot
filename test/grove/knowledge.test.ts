@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import type { KnowledgeSource } from "../../src/config.ts";
-import { handbookUrl, identifierWords } from "../../src/grove/knowledge/chunk.ts";
+import { handbookUrl, identifierWords, prepare } from "../../src/grove/knowledge/chunk.ts";
 import { ftsQuery, KnowledgeStore } from "../../src/grove/knowledge/store.ts";
 import { KnowledgeSync } from "../../src/grove/knowledge/sync.ts";
 import { readTar } from "../../src/grove/knowledge/tar.ts";
@@ -93,6 +93,16 @@ describe("knowledge", () => {
     assert.equal(handbookUrl("src/content/docs/datapack/02-powers/resource.md", null), "https://0vergrown.github.io/Handbook/docs/datapack/powers/resource/");
     assert.equal(handbookUrl("src/content/docs/datapack/18-origins/05-badge-types/badge_sprite.md", null), "https://0vergrown.github.io/Handbook/docs/datapack/origins/badge_sprite/");
     assert.equal(handbookUrl("src/content/blog/2026-10-08-close-menus.md", null), "https://0vergrown.github.io/Handbook/blog/close-menus/");
+  });
+
+  it("keeps a page's legacy ids under its Type ID, since the frontmatter isn't kept", () => {
+    const handbook: KnowledgeSource = { name: "handbook", repo: "0vergrown/Handbook", branch: "main", kind: "docs" };
+    const page = `---\ntitle: "Action On Key Press (Power Type)"\naliases: ["active_self", "sync:action_on_key_sequence"]\n---\n\nRuns an action on a key.\n\n**Type ID:** \`apoli:action_on_key_press\`\n\n## Fields\n`;
+    const prepared = prepare(handbook, "src/content/docs/datapack/02-powers/action_on_key_press.md", page);
+    assert.match(prepared?.file.text ?? "", /^\*\*Type ID:\*\* `apoli:action_on_key_press`\n\nAlso answers to: `apoli:active_self`, `sync:action_on_key_sequence`\n/m);
+    assert.match(prepared?.chunks[0]?.keywords ?? "", /active_self/);
+    const plain = prepare(handbook, "src/content/docs/datapack/02-powers/heal.md", "---\ntitle: \"Heal\"\n---\n\nType ID: `apoli:heal`\n");
+    assert.doesNotMatch(plain?.file.text ?? "", /Also answers to/);
   });
 
   it("splits code identifiers into words people search for", () => {
