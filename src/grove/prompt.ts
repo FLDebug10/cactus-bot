@@ -1,16 +1,17 @@
-// Puts one reply's prompt together: Grove's persona, the moment, Handbook
-// notes, then the recent conversation as chat turns (Grove's own lines as its
+// Puts one reply's prompt together: Grove's persona, the moment, the notes
+// (Handbook pages and source), then the recent conversation as chat turns (Grove's own lines as its
 // turns, everyone else's as "name: text"), ending with the message to answer.
 // Each part has a budget so the whole thing fits the model's context.
 
 import type { Message } from "ollama";
-import type { SearchHit } from "./knowledge/store.ts";
+import type { Note } from "./notes.ts";
 import type { ChatLine, TextAttachment } from "./types.ts";
 
 export interface PromptInput {
   persona: string;
   moment: string;
-  notes: readonly SearchHit[];
+  // null: the message isn't about the mods. []: it is, but the library had nothing.
+  notes: readonly Note[] | null;
   transcript: readonly ChatLine[];
   target: ChatLine;
   // The message the target replies to, when it isn't in the transcript.
@@ -26,6 +27,7 @@ export interface Prompt {
 }
 
 const LINE_MAX = 600;
+const NOTE_MAX = 2_800;
 
 function squash(text: string, max: number): string {
   const flat = text.trim();
@@ -39,19 +41,22 @@ function label(line: ChatLine, byId: ReadonlyMap<string, ChatLine>): string {
   return `${line.authorName} (replying to ${parent.isGrove ? "you" : parent.authorName})`;
 }
 
-function notesBlock(notes: readonly SearchHit[], budget: number): string {
-  if (notes.length === 0) return "";
+function notesBlock(notes: readonly Note[] | null, budget: number): string {
+  if (notes === null) return "";
+  if (notes.length === 0) {
+    return "\n\nREFERENCE NOTES\nNothing in the library matched this message. If they're asking how something in Apoli or Origins works, call search_handbook or search_source before you answer, and say you're not sure if you still find nothing.";
+  }
   const parts: string[] = [];
   let used = 0;
   for (const note of notes) {
     const room = budget - used;
     if (room < 300) break;
-    const body = squash(note.body, Math.min(room - 150, 1_800));
-    const part = `[${note.title}](${note.url})\n${body}`;
+    const body = squash(note.body, Math.min(room - 150, NOTE_MAX));
+    const part = `${note.url.length > 0 ? `[${note.title}](${note.url})` : note.title}\n${body}`;
     parts.push(part);
     used += part.length;
   }
-  return `\n\nREFERENCE NOTES (from the Handbook, matched to their message. Use them when they fit, ignore them when they don't)\n\n${parts.join("\n\n---\n\n")}`;
+  return `\n\nREFERENCE NOTES (the real Handbook pages and Apoli/Origins source that match their message. Build your answer from them: copy type ids and field names exactly, and never invent one that isn't here. If they don't cover the question, call search_handbook or search_source yourself instead of guessing)\n\n${parts.join("\n\n---\n\n")}`;
 }
 
 function attachmentBlock(attachments: readonly TextAttachment[], budget: number): string {
@@ -68,7 +73,7 @@ function attachmentBlock(attachments: readonly TextAttachment[], budget: number)
 }
 
 export function buildPrompt(input: PromptInput): Prompt {
-  const budget = { transcript: 4_000, notes: 4_500, attachments: 5_000, ...input.budget };
+  const budget = { transcript: 4_000, notes: 6_500, attachments: 5_000, ...input.budget };
   const system = `${input.persona}\n\n${input.moment}${notesBlock(input.notes, budget.notes)}`;
 
   const known = new Map<string, ChatLine>();

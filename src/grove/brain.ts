@@ -80,6 +80,8 @@ const ONLINE_RECHECK_MS = 60_000;
 const OFFLINE_RECHECK_MS = 20_000;
 const CREDITS_RECHECK_MS = 5 * 60_000;
 const PROBE_TIMEOUT_MS = 6_000;
+// Said to the model once its lookups are used up, so it answers instead of promising to check.
+const WRAP_UP = "(You can't look anything else up now. Answer them with what the notes and your lookups showed. If that doesn't cover it, say you're not sure and point them to the support channel or the Handbook. Don't say you'll check.)";
 const DEFAULT_REST_MS = 15 * 60_000;
 
 function withTimeout(base: typeof fetch, ms: number): typeof fetch {
@@ -314,6 +316,9 @@ export class Brain {
 
     for (let round = 0; ; round++) {
       const offerTools = useTools && round < maxRounds && toolChars < toolBudget;
+      if (useTools && !offerTools && toolCalls.length > 0 && messages[messages.length - 1]?.role === "tool") {
+        messages.push({ role: "user", content: WRAP_UP });
+      }
       let response;
       try {
         response = await this.client.chat({

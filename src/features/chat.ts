@@ -1,12 +1,15 @@
 import { AttachmentBuilder, type Client, type Message, MessageReferenceType } from "discord.js";
 import { fileURLToPath } from "node:url";
-import { BRAIN, CHANNELS, type ChannelKey, CREW, type CrewMember, MODERATION } from "../config.ts";
+import { BRAIN, CHANNELS, type ChannelKey, codeSourcesOf, CREW, type CrewMember, MAIN_BUILD, MODERATION } from "../config.ts";
 import type { StrikeStore } from "../db/strikes.ts";
 import { isStaff } from "../discord/members.ts";
 import { addressingOf } from "../grove/addressing.ts";
 import { type BrainChain, BrainUnavailable, type ToolBox } from "../grove/brain.ts";
+import { checkedReply } from "../grove/checked.ts";
 import { History } from "../grove/history.ts";
-import type { KnowledgeStore, SearchHit } from "../grove/knowledge/store.ts";
+import type { KnowledgeStore } from "../grove/knowledge/store.ts";
+import { describeGifs, gifAttachment } from "../grove/links.ts";
+import { gatherNotes, type Note, notesQuery } from "../grove/notes.ts";
 import { persona, rightNow } from "../grove/persona.ts";
 import { buildPrompt } from "../grove/prompt.ts";
 import { asksAboutExplosives, EXPLOSIVE_LINES, explicitMatch, explicitReply, mentionsRealExplosives, TNT_RECIPE_IMAGE } from "../grove/reflexes.ts";
@@ -31,9 +34,6 @@ const PURPOSES: Partial<Record<ChannelKey, string>> = {
   jamDiscussion: "where people talk about the jams",
 };
 
-// Words that make a message worth a Handbook lookup before the brain answers.
-const MOD_TOPIC = /\b(apoli|origins?|powers?|datapacks?|data ?packs?|addons?|json|mcfunction|conditions?|actions?|keybinds?|resources?|hud|badges?|layers?|modrinth|curseforge|fabric|neoforge|mods?|handbook|docs|crash\w*|errors?|bugs?|install\w*|download\w*|versions?|loader|command|commands|1\.20\.1|1\.21\.1|merling|enderian|elytrian|avian|arachnid|shulk|feline|blazeborn|phantom|slimekin|buzzborne)\b|\b[a-z0-9_]+:[a-z0-9_/]+\b/i;
-
 const TEXT_FILE = /\.(json|txt|log|mcfunction|java|toml|ya?ml|md|properties|mcmeta|cfg|js|ts)$/i;
 const IMAGE_TYPE = /^image\/(png|jpe?g|webp)$/i;
 
@@ -41,6 +41,9 @@ const DEBOUNCE_MS = 1_500;
 const STALE_MS = 3 * 60_000;
 const OFFLINE_NOTICE_EVERY_MS = 15 * 60_000;
 const TRANSCRIPT_LINES = 16;
+// Tool results one reply may collect. The notes already carry most of what a lookup would find.
+const TOOL_CHARS = 4_000;
+const CODE_SOURCES = codeSourcesOf(MAIN_BUILD);
 const TRANSCRIPT_AGE_MS = 45 * 60_000;
 const OFFLINE_LINE = "zzz... my chatting brain is napping right now, so i can't chat. my commands still work though, try !help";
 const OFF_TOPIC_LINE = "hmm, let's talk about something else!";
@@ -278,7 +281,7 @@ export class GroveChat {
       const thread = await this.threadInfo(message);
       const attachments = await readTextAttachments(message);
       const images = BRAIN.vision && this.options.brain.can("vision") ? await readImages(message) : [];
-      const notes = this.notesFor(merged.content, replyTo);
+      const notes = this.notesFor(merged, replyTo, transcript);
 
       const prompt = buildPrompt({
         persona: this.personaText,
@@ -291,6 +294,7 @@ export class GroveChat {
           speaker: { id: message.author.id, name: target.authorName, crew: crewOf(message.author.id), staff: isStaff(message.member) },
           addressing: job.addressing,
           imageCount: images.length,
+          gif: merged.content.includes("[gif"),
         }),
         notes,
         transcript,
@@ -299,7 +303,9 @@ export class GroveChat {
         attachments,
       });
 
-      const reply = await this.options.brain.reply({ system: prompt.system, messages: prompt.messages, images, tools: this.tools, maxToolRounds: 3 });
+      const knowledge = this.options.knowledge;
+      const catalog = knowledge !== null && !knowledge.isEmpty() ? knowledge.catalog() : null;
+      const reply = await checkedReply(this.options.brain, { system: prompt.system, messages: prompt.messages, images, tools: this.tools, maxToolRounds: 3, toolBudget: TOOL_CHARS }, catalog);
       for (const line of [target, ...extra]) this.covered.add(line.id);
       let text = voice(reply.text, { channels: this.channelList });
       if (text === null) {
@@ -314,7 +320,7 @@ export class GroveChat {
 
       await message.reply({ content: text, allowedMentions: { parse: [], repliedUser: false }, failIfNotExists: false });
       this.history.noteAnswered(message.channelId, message.author.id, Date.now());
-      const tools = reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : "";
+      const tools = `${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed invented json" : ""}`;
       log.info(`answered ${target.authorName} in ${message.channelId} with the ${reply.brain} brain (${job.addressing}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${tools})`);
     } finally {
       stopTyping();
@@ -362,12 +368,12 @@ export class GroveChat {
     return info;
   }
 
-  private notesFor(text: string, replyTo: ChatLine | null): SearchHit[] {
+  // What the library says about the message, read before the brain answers.
+  // null when the message isn't about the mods (or there is no library yet).
+  private notesFor(target: ChatLine, replyTo: ChatLine | null, transcript: readonly ChatLine[]): Note[] | null {
     const knowledge = this.options.knowledge;
-    if (knowledge === null || knowledge.isEmpty()) return [];
-    const query = replyTo !== null && !replyTo.isGrove ? `${text}\n${replyTo.content}` : text;
-    if (!MOD_TOPIC.test(query)) return [];
-    return knowledge.search(query, { kind: "docs", limit: 3 });
+    if (knowledge === null || knowledge.isEmpty()) return null;
+    return gatherNotes(knowledge, notesQuery(target, replyTo, transcript), { codeSources: CODE_SOURCES });
   }
 
   // The message as plain text: "@name" for mentions, "#name" for channels, ":name:" for emoji.
@@ -377,7 +383,7 @@ export class GroveChat {
       if (id === groveId) return "grove";
       return message.mentions.members?.get(id)?.displayName ?? message.mentions.users.get(id)?.displayName ?? "someone";
     };
-    let content = message.content
+    let content = describeGifs(message.content)
       .replace(/<@!?(\d+)>/g, (_, id: string) => `@${name(id)}`)
       .replace(/<@&(\d+)>/g, (_, id: string) => `@${message.mentions.roles.get(id)?.name ?? "role"}`)
       .replace(/<#(\d+)>/g, (_, id: string) => {
@@ -386,9 +392,17 @@ export class GroveChat {
         return `#${known?.name ?? (channel !== undefined && "name" in channel && typeof channel.name === "string" ? cleanChannelName(channel.name) : "channel")}`;
       })
       .replace(/<a?:(\w+):\d+>/g, ":$1:");
-    const files = [...message.attachments.values()].map(attachment => attachment.name);
+    const files: string[] = [];
+    const gifs: string[] = [];
+    for (const attachment of message.attachments.values()) {
+      const gif = gifAttachment(attachment.name, attachment.contentType);
+      if (gif === null) files.push(attachment.name);
+      else gifs.push(gif);
+    }
     if (files.length > 0) content += ` [attached: ${files.join(", ")}]`;
+    if (gifs.length > 0) content += ` ${gifs.join(" ")}`;
     if (message.stickers.size > 0) content += ` [sticker: ${[...message.stickers.values()].map(sticker => sticker.name).join(", ")}]`;
+    if (!content.includes("[gif") && message.embeds.some(found => found.data.type === "gifv")) content += " [gif]";
     const embed = message.embeds[0];
     if (content.trim().length === 0 && embed !== undefined) content = `[embed] ${[embed.title, embed.description].filter(Boolean).join(": ")}`;
     return {

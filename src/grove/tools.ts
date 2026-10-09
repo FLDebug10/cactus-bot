@@ -3,6 +3,7 @@
 // seven in its head), and roll dice.
 
 import type { Tool } from "ollama";
+import { BUILDS, codeSourcesOf, MAIN_BUILD } from "../config.ts";
 import { mathIn, solveMath, spokenValue } from "./arithmetic.ts";
 import type { ToolBox } from "./brain.ts";
 import { rollDice } from "./dice.ts";
@@ -30,10 +31,11 @@ export const TOOL_DEFINITIONS: Tool[] = [
   ),
   tool(
     "search_source",
-    "Search the Apoli and Origins Java source code and the built-in Origins data (origins and their powers). Use it when the Handbook doesn't answer, or to check how something really behaves.",
+    "Search the Apoli and Origins Java source code and the built-in Origins data (origins and their powers). Use it when the Handbook doesn't answer, or to check how something really behaves. It searches Fabric 1.21.1, the version the Handbook documents, unless you pick another version.",
     {
       query: { type: "string", description: "Class names, type ids or words, e.g. \"ShaderPower\" or \"merling water breathing\"" },
       mod: { type: "string", description: "Only search one mod", enum: ["apoli", "origins"] },
+      version: { type: "string", description: `Which build's code (default ${MAIN_BUILD})`, enum: [...BUILDS] },
     },
     ["query"],
   ),
@@ -43,6 +45,7 @@ export const TOOL_DEFINITIONS: Tool[] = [
     {
       path: { type: "string", description: "The file path or link from search_source" },
       line: { type: "number", description: "Line to center on" },
+      version: { type: "string", description: `Which build's code (default ${MAIN_BUILD})`, enum: [...BUILDS] },
     },
     ["path"],
   ),
@@ -76,6 +79,16 @@ function listHits(hits: readonly SearchHit[]): string {
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
+}
+
+// Models write "1.20.1", "fabric 1.20.1" or "Neoforge" for a build; anything unclear means the main one.
+function buildOf(value: unknown): string {
+  const text = asString(value).toLowerCase();
+  const exact = BUILDS.find(build => build === text);
+  if (exact !== undefined) return exact;
+  if (text.includes("neoforge") || text.includes("neo")) return "neoforge-1.21.1";
+  if (text.includes("1.20")) return "fabric-1.20.1";
+  return MAIN_BUILD;
 }
 
 export function calculate(expression: string): string {
@@ -126,11 +139,12 @@ export function groveTools(knowledge: KnowledgeStore | null, random: () => numbe
         case "search_source": {
           if (!ready()) return NOT_READY;
           const mod = asString(args["mod"]);
-          return listHits(knowledge!.search(asString(args["query"]), { kind: "code", limit: 5, ...(mod === "apoli" || mod === "origins" ? { source: mod } : {}) }));
+          const sources = codeSourcesOf(buildOf(args["version"]), mod === "apoli" || mod === "origins" ? mod : undefined);
+          return listHits(knowledge!.search(asString(args["query"]), { kind: "code", limit: 5, source: sources }));
         }
         case "read_source_file": {
           if (!ready()) return NOT_READY;
-          const file = knowledge!.findFile(asString(args["path"]));
+          const file = knowledge!.findFile(asString(args["path"]), codeSourcesOf(buildOf(args["version"])));
           if (file === null) return "no file like that. search_source first.";
           const lines = file.text.replace(/\r?\n$/, "").split(/\r?\n/);
           const line = Number(args["line"]);

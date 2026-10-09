@@ -116,6 +116,23 @@ describe("brain", () => {
     assert.equal(last.options?.["draft_num_predict"], 3);
   });
 
+  it("tells the model to answer once its lookups are used up", async () => {
+    const grove = brain({ url: local.url, model: "grove-test" });
+    await grove.check();
+    grove.stop();
+    const reply = await grove.reply({
+      system: "you are grove",
+      messages: [{ role: "user", content: "sam: what's the max of a resource?" }],
+      tools: { definitions: [], run: async () => "Resource (Power Type): max is required" },
+      maxToolRounds: 1,
+    });
+    assert.equal(reply.text, "the max is 10!");
+    const last = local.seen[local.seen.length - 1]!;
+    assert.equal(last.tools, false);
+    assert.equal(last.messages[last.messages.length - 1]?.role, "user");
+    assert.match(last.messages[last.messages.length - 1]?.content ?? "", /can't look anything else up[^]*Don't say you'll check/);
+  });
+
   it("stays offline when the model isn't pulled", async () => {
     const grove = brain({ url: local.url, model: "missing-model" });
     const status = await grove.check();

@@ -58,7 +58,7 @@ describe("prompt", () => {
     const prompt = buildPrompt({
       persona: "PERSONA",
       moment: "MOMENT",
-      notes: [],
+      notes: null,
       transcript,
       target: line("4", "sam", "what's a power?", 4_000),
       replyTo: null,
@@ -83,7 +83,7 @@ describe("prompt", () => {
     const prompt = buildPrompt({
       persona: "P",
       moment: "M",
-      notes: [{ source: "handbook", kind: "docs", path: "p", title: "Resource (Power Type)", url: "https://0vergrown.github.io/Handbook/docs/datapack/powers/resource/", body: "Type ID: `apoli:resource`", snippet: "", startLine: 1, endLine: 1 }],
+      notes: [{ title: "Resource (Power Type)", url: "https://0vergrown.github.io/Handbook/docs/datapack/powers/resource/", body: "Type ID: `apoli:resource`" }, { title: "Colors in their message", url: "", body: "#8f0f99 = rgb(143, 15, 153)" }],
       transcript: [],
       target: line("1", "sam", "how do resources work", 1),
       replyTo: null,
@@ -91,5 +91,12 @@ describe("prompt", () => {
     });
     assert.match(prompt.system, /REFERENCE NOTES/);
     assert.match(prompt.system, /\[Resource \(Power Type\)\]\(https:\/\/0vergrown\.github\.io\/Handbook\/docs\/datapack\/powers\/resource\/\)/);
+    assert.match(prompt.system, /\nColors in their message\n#8f0f99 = rgb\(143, 15, 153\)/);
+  });
+
+  it("tells the model to look things up when the library had nothing, and says nothing for other chat", () => {
+    const base = { persona: "P", moment: "M", transcript: [], target: line("1", "sam", "hi", 1), replyTo: null, attachments: [] };
+    assert.match(buildPrompt({ ...base, notes: [] }).system, /Nothing in the library matched[^]*search_handbook/);
+    assert.equal(buildPrompt({ ...base, notes: null }).system, "P\n\nM");
   });
 });

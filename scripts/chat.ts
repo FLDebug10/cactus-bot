@@ -6,17 +6,20 @@
 //   how do i make a resource bar     say something to Grove as "you"
 //   @sam: grove are you a cactus     say something as someone else
 //   /sync                            download the Handbook + source library (first run)
-//   /notes                           show which Handbook notes the last reply got
+//   /notes                           show which notes (Handbook pages, source) the last reply got
 //   /quit                            leave
 
 import "dotenv/config";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { KNOWLEDGE, SETTINGS } from "../src/config.ts";
+import { codeSourcesOf, KNOWLEDGE, MAIN_BUILD, SETTINGS } from "../src/config.ts";
 import { brainsFromConfig } from "../src/grove/brains.ts";
+import { checkedReply } from "../src/grove/checked.ts";
 import { History } from "../src/grove/history.ts";
-import { KnowledgeStore, type SearchHit } from "../src/grove/knowledge/store.ts";
+import { KnowledgeStore } from "../src/grove/knowledge/store.ts";
 import { KnowledgeSync } from "../src/grove/knowledge/sync.ts";
+import { describeGifs } from "../src/grove/links.ts";
+import { gatherNotes, type Note, notesQuery } from "../src/grove/notes.ts";
 import { persona, rightNow } from "../src/grove/persona.ts";
 import { buildPrompt } from "../src/grove/prompt.ts";
 import { asksAboutExplosives, explicitMatch, explicitReply } from "../src/grove/reflexes.ts";
@@ -42,7 +45,7 @@ const personaText = persona({ channels, commands: ["!help: lists every command",
 
 let nextId = 1;
 let strikes = 0;
-let lastNotes: SearchHit[] = [];
+let lastNotes: Note[] | null = null;
 
 function line(author: string, content: string, isGrove = false): ChatLine {
   return { id: String(nextId++), channelId: CHANNEL, authorId: isGrove ? "grove" : author, authorName: author, isGrove, isBot: isGrove, content, at: Date.now(), replyToId: null };
@@ -54,40 +57,40 @@ for (const status of await brain.check()) {
 if (knowledge.isEmpty()) console.log("the library is empty, type /sync to download the handbook and source (about a minute)");
 brain.stop();
 
-const rl = createInterface({ input: stdin, output: stdout });
-for (;;) {
-  const input = (await rl.question("> ")).trim();
-  if (input.length === 0) continue;
-  if (input === "/quit") break;
+// Reads lines as they come, so a scripted conversation can be piped in too:
+//   printf '%s\n' 'how do i make a player smaller' '/notes' | npm run chat
+async function handle(input: string): Promise<boolean> {
+  if (input.length === 0) return false;
+  if (input === "/quit") return true;
   if (input === "/sync") {
     for (const result of await sync.syncAll(true)) console.log(`  ${result.source}: ${result.status}${result.files !== undefined ? ` (${result.files} files)` : ""}${result.error !== undefined ? ` ${result.error}` : ""}`);
-    continue;
+    return false;
   }
   if (input === "/notes") {
-    console.log(lastNotes.length === 0 ? "  (no notes)" : lastNotes.map(note => `  ${note.title} ${note.url}`).join("\n"));
-    continue;
+    console.log(lastNotes === null ? "  (not a question about the mods)" : lastNotes.length === 0 ? "  (the library had nothing)" : lastNotes.map(note => `  ${note.title} ${note.url}\n${note.body.split("\n").slice(0, 3).map(line => `    ${line.slice(0, 110)}`).join("\n")}`).join("\n"));
+    return false;
   }
 
   const other = /^@(\w+):\s*(.*)$/.exec(input);
   const author = other?.[1] ?? "you";
-  const target = line(author, other?.[2] ?? input);
+  const target = line(author, describeGifs(other?.[2] ?? input));
   const transcript = history.before(CHANNEL, target.id, 16, 45 * 60_000);
   history.add(target);
 
   if (explicitMatch(target.content) !== null) {
     strikes++;
     console.log(`grove: ${explicitReply(strikes, strikes >= 2 ? 10 : null)}  [explicit, strike ${strikes}]`);
-    continue;
+    return false;
   }
   if (asksAboutExplosives(target.content)) {
     console.log("grove: here's the only bomb recipe i know! 5 gunpowder and 4 sand  [+ minecraft_tnt_crafting_recipe.png]");
-    continue;
+    return false;
   }
 
-  lastNotes = knowledge.isEmpty() ? [] : knowledge.search(target.content, { kind: "docs", limit: 3 });
+  lastNotes = knowledge.isEmpty() ? null : gatherNotes(knowledge, notesQuery(target, null, transcript), { codeSources: codeSourcesOf(MAIN_BUILD) });
   const prompt = buildPrompt({
     persona: personaText,
-    moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0 }),
+    moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0, gif: target.content.includes("[gif") }),
     notes: lastNotes,
     transcript,
     target,
@@ -96,16 +99,28 @@ for (;;) {
   });
   try {
     await brain.check();
-    const reply = await brain.reply({ system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3 });
+    const reply = await checkedReply(brain, { system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3, toolBudget: 4_000 }, knowledge.isEmpty() ? null : knowledge.catalog());
     const text = voice(reply.text, { channels }) ?? "(stays quiet)";
     history.add(line("grove", text, true));
     console.log(`grove: ${text}`);
-    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}]`);
+    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed invented json" : ""}]`);
   } catch (error) {
     console.log(`  (the brain didn't answer: ${error instanceof Error ? error.message : String(error)})`);
   } finally {
     brain.stop();
   }
+  return false;
+}
+
+const rl = createInterface({ input: stdin, output: stdout, prompt: "> " });
+let closed = false;
+rl.on("close", () => {
+  closed = true;
+});
+rl.prompt();
+for await (const raw of rl) {
+  if (await handle(raw.trim())) break;
+  if (!closed) rl.prompt();
 }
 rl.close();
 knowledge.close();

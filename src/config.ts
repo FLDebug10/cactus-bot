@@ -127,18 +127,38 @@ export const CLOUD = {
 } as const;
 
 export interface KnowledgeSource {
+  // The key in the library, and in search filters.
   name: string;
   repo: string;
   branch: string;
   kind: "docs" | "code";
+  // For source code: which mod and which build ("fabric-1.21.1"), so a question about
+  // 1.20.1 or NeoForge searches the right tree.
+  mod?: "apoli" | "origins";
+  build?: string;
 }
 
-// What Grove can look things up in: the Handbook, and the mods' own source.
-// Fabric 1.21.1 is the version the Handbook documents.
+// The build the Handbook documents, and the one Grove searches unless asked otherwise.
+export const MAIN_BUILD = "fabric-1.21.1";
+export const BUILDS = ["fabric-1.21.1", "fabric-1.20.1", "neoforge-1.21.1"] as const;
+
+function code(mod: "apoli" | "origins", build: (typeof BUILDS)[number]): KnowledgeSource {
+  const [loader, version] = build.split("-") as [string, string];
+  return {
+    name: build === MAIN_BUILD ? mod : `${mod}-${build}`,
+    repo: `0vergrown/${mod === "apoli" ? "Apoli" : "Origins"}`,
+    branch: `${loader === "fabric" ? "Fabric" : "NeoForge"}-${version}`,
+    kind: "code",
+    mod,
+    build,
+  };
+}
+
+// What Grove can look things up in: the Handbook, and the mods' own source for
+// every loader and Minecraft version they ship on (one branch per build).
 const KNOWLEDGE_SOURCES: readonly KnowledgeSource[] = [
   { name: "handbook", repo: "0vergrown/Handbook", branch: "main", kind: "docs" },
-  { name: "apoli", repo: "0vergrown/Apoli", branch: "Fabric-1.21.1", kind: "code" },
-  { name: "origins", repo: "0vergrown/Origins", branch: "Fabric-1.21.1", kind: "code" },
+  ...(["apoli", "origins"] as const).flatMap(mod => BUILDS.map(build => code(mod, build))),
 ];
 
 export const KNOWLEDGE = {
@@ -146,6 +166,11 @@ export const KNOWLEDGE = {
   refreshHours: envInt("GROVE_KNOWLEDGE_REFRESH_HOURS", 6),
   sources: KNOWLEDGE_SOURCES,
 } as const;
+
+// The library sources holding one build's code, e.g. ["apoli", "origins"] for the main build.
+export function codeSourcesOf(build: string, mod?: string): string[] {
+  return KNOWLEDGE_SOURCES.filter(source => source.kind === "code" && source.build === build && (mod === undefined || source.mod === mod)).map(source => source.name);
+}
 
 export const MODERATION = {
   // Repeat explicit questions inside the window get a timeout, longer each time.

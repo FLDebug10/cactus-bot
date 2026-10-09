@@ -40,7 +40,13 @@ export const BRAIN_COMMANDS: readonly Command[] = [
 
       const sources = services.knowledge?.sources() ?? [];
       if (sources.length === 0) lines.push("📚 my library of the handbook and the mods' code is still downloading");
-      else lines.push(`📚 library: ${sources.map(source => `${source.name} (${source.files} files, checked ${since(source.syncedAt)})`).join(", ")}`);
+      else {
+        // The Handbook and the main build of each mod are listed; the other builds (1.20.1, NeoForge) are a count.
+        const main = sources.filter(source => !source.name.includes("-"));
+        const other = sources.length - main.length;
+        const shown = main.map(source => `${source.name} (${source.files} files, checked ${since(source.syncedAt)})`).join(", ");
+        lines.push(`📚 library: ${shown}${other > 0 ? `, and the 1.20.1 and NeoForge code (${other} more)` : ""}`);
+      }
       return message.reply({ content: lines.join("\n"), allowedMentions: { parse: [] } });
     },
   },

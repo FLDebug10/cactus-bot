@@ -40,7 +40,11 @@ Grove's voice is enforced after the model writes (`src/grove/voice.ts`): lowerca
 |-------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | mentions Grove, replies to it, or says its name ("hey grove", "grove, how do i...")       | answers with the brain, using the last ~16 messages, the replied-to message, the thread's first post, attached text files (power JSON, logs) and screenshots                                            |
 | keeps talking right after Grove answered them                                             | the brain decides whether it was meant for Grove, and stays quiet if not                                                                                                                                |
-| asks about Apoli, Origins, powers, datapacks, crashes                                     | Grove reads matching Handbook pages first, and can search the Handbook and the Apoli/Origins source with tools before answering, linking the page it used                                               |
+| asks about Apoli, Origins, powers, datapacks, crashes                                     | Grove reads before it answers (it doesn't have to remember to look): the Handbook page named after what was asked (fields and an example), the Java class behind that power, action or condition, and source matches when the question is about code. It can still search for more with tools, and links the page it used |
+| asks for a power in their own words ("make me smaller", "fly when I press a key")       | the words are mapped to the docs' words (`src/grove/knowledge/synonyms.ts`), so "smaller" finds `apoli:scale`. Hex colors are converted to the 0-1 channels and decimal numbers the fields use |
+| asks about 1.20.1 or NeoForge                                                             | Grove searches the Fabric 1.21.1 code (the version the Handbook documents) unless the question is about another build, then the search tool takes a `version` |
+| gets json from Grove with a power, action or condition that does not exist                | every `"type"` and field in a reply is checked against the Handbook and the source. A wrong one makes Grove look again once, and json it still can't back up is left out and replaced by a note |
+| posts a GIF (Tenor, Giphy, Klipy or a `.gif` file)                                       | Grove can't open links, so the GIF's title is read from its address: `klipy.com/gifs/rpx-syria-mic-drop-1` reaches the brain as `[gif: rpx syria mic drop]` and it reacts to the mood |
 | asks anything about **explosives** (bombs, dynamite, C4, grenades, TNT...)                | always gets Minecraft's TNT recipe image and a joke, with or without the brain. A modding question that only mentions TNT next to powers, commands or ids goes to the brain as normal                   |
 | asks anything **sexual or explicit**                                                      | gets a warning that it isn't appropriate and that they'll be timed out if it continues. Within 24 hours, the second time is a 10 minute timeout and later ones an hour. Works with or without the brain |
 | asks "where do I report a bug / post an idea / submit to the jam" to nobody in particular | if no person answered within 45 seconds, Grove points to the right channel (brain not needed)                                                                                                           |
@@ -106,7 +110,10 @@ src/
     addressing.ts       is this message for Grove?
     history.ts          the last messages per channel, in memory
     tools.ts            what the model may call: handbook/source search, calculator, dice
-    knowledge/          GitHub tarball sync, chunking, and the SQLite full-text index
+    notes.ts            what Grove reads before answering: the Handbook page, the class behind it, source matches, color conversions
+    checked.ts verify.ts  checks the json in a reply against real type ids and fields, and has Grove fix or drop what it invented
+    links.ts            turns GIF links into "[gif: title]"
+    knowledge/          GitHub tarball sync, chunking, the SQLite full-text index, synonyms.ts, catalog.ts (every real type id and field)
     day.ts arithmetic.ts dice.ts
   features/             chat (the Discord side of the brain), signpost, modmail, media gallery, suggestion tags
   commands/             !commands (one declarative list) and the /register slash commands
@@ -121,7 +128,8 @@ assets/                 images used by !bars, !badges and the TNT reflex
 ## Teaching Grove something new
 
 - **Facts about Grove, the server or the mods:** `src/grove/persona.ts`. Keep it short, it is sent with every reply.
-- **Mod knowledge:** comes from the Handbook and the source on GitHub automatically (`KNOWLEDGE.sources` in `src/config.ts`). Update the Handbook and Grove knows within six hours, or run `!brain sync`.
+- **Mod knowledge:** comes from the Handbook and the source on GitHub automatically (`KNOWLEDGE.sources` in `src/config.ts`: the Handbook plus one branch of Apoli and Origins per build, Fabric 1.21.1, Fabric 1.20.1 and NeoForge 1.21.1). Update the Handbook and Grove knows within six hours, or run `!brain sync`. Only pushed commits count, not what is on a developer's disk.
+- **Words people use that the docs don't:** `src/grove/knowledge/synonyms.ts` maps them ("smaller" to `scale`). Keep it to obvious gaps, plurals and endings are already handled by the index.
 - **Channels Grove points to:** `PURPOSES` in `src/features/chat.ts` and the pointers in `src/features/signpost.ts`.
 - **Things that must never depend on the model:** `src/grove/reflexes.ts`, with tests in `test/grove/reflexes.test.ts`.
 

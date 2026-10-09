@@ -59,7 +59,7 @@ In a clone of this repo, with Node 22.18+:
 
 ```sh
 npm install
-npm run knowledge -- sync    # downloads the Handbook + Apoli/Origins source index (~1 minute)
+npm run knowledge -- sync    # downloads the Handbook + the Apoli/Origins source of every build (about 20 seconds)
 npm run chat                 # talk to Grove in the terminal, against your local Ollama
 ```
 
