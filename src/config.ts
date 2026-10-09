@@ -12,6 +12,11 @@ function envFlag(name: string, fallback: boolean): boolean {
   return !["0", "false", "no", "off"].includes(value.toLowerCase());
 }
 
+function envInt(name: string, fallback: number): number {
+  const value = Number.parseInt(env(name) ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 export const GUILD_ID = "1531431326371283196";
 
 export const CHANNELS = {
@@ -85,4 +90,66 @@ export const SETTINGS = {
   // Removes text-only posts from the media gallery and explains the rule.
   moderateMediaGallery: envFlag("GROVE_MODERATE_MEDIA", true),
   logLevel: env("LOG_LEVEL") ?? "info",
+} as const;
+
+// Grove's chatting brain: an Ollama server on Overgrown's computer, which the VM
+// reaches through an SSH tunnel (see deploy/brain/SETUP.md). When it can't be
+// reached, Grove still runs every command and moderation rule, it just doesn't chat.
+export const BRAIN = {
+  url: env("GROVE_BRAIN_URL") ?? "http://127.0.0.1:11434",
+  model: env("GROVE_BRAIN_MODEL") ?? "qwen3.5:4b",
+  // Tokens the model can see at once: persona, recent chat, handbook notes and tool results.
+  contextTokens: envInt("GROVE_BRAIN_CONTEXT", 8192),
+  // How long Ollama keeps the model in memory after a reply ("10m", "1h"). Unset = Ollama's default.
+  keepAlive: env("GROVE_BRAIN_KEEP_ALIVE") ?? null,
+  // Let thinking models reason before answering. Smarter, but much slower.
+  think: envFlag("GROVE_BRAIN_THINK", false),
+  timeoutMs: envInt("GROVE_BRAIN_TIMEOUT_MS", 120_000),
+  // Show the model screenshots people attach, when it can see images.
+  vision: envFlag("GROVE_BRAIN_VISION", true),
+  // Tell people (at most every 15 minutes per channel) when the brain is asleep.
+  offlineNotice: envFlag("GROVE_OFFLINE_NOTICE", true),
+  // For models with built-in multi-token prediction (qwen3.5:4b-mtp-q4_K_M): how
+  // many tokens to guess ahead. Unset = off. 3 is a good start.
+  draftTokens: envInt("GROVE_BRAIN_DRAFT_TOKENS", 0) || null,
+} as const;
+
+// An optional second brain on Ollama's cloud, which works while Overgrown's
+// computer is off but has monthly credits. Without an API key it isn't used.
+export const CLOUD = {
+  apiKey: env("GROVE_CLOUD_API_KEY") ?? env("OLLAMA_API_KEY") ?? null,
+  url: env("GROVE_CLOUD_URL") ?? "https://ollama.com",
+  model: env("GROVE_CLOUD_MODEL") ?? "glm-5.3-flash",
+  // true: the cloud answers first and the local model takes over when credits run
+  // out. false: the local model answers, the cloud only covers while it's off.
+  first: envFlag("GROVE_CLOUD_FIRST", true),
+  contextTokens: envInt("GROVE_CLOUD_CONTEXT", 32_768),
+} as const;
+
+export interface KnowledgeSource {
+  name: string;
+  repo: string;
+  branch: string;
+  kind: "docs" | "code";
+}
+
+// What Grove can look things up in: the Handbook, and the mods' own source.
+// Fabric 1.21.1 is the version the Handbook documents.
+const KNOWLEDGE_SOURCES: readonly KnowledgeSource[] = [
+  { name: "handbook", repo: "0vergrown/Handbook", branch: "main", kind: "docs" },
+  { name: "apoli", repo: "0vergrown/Apoli", branch: "Fabric-1.21.1", kind: "code" },
+  { name: "origins", repo: "0vergrown/Origins", branch: "Fabric-1.21.1", kind: "code" },
+];
+
+export const KNOWLEDGE = {
+  path: env("GROVE_KNOWLEDGE_PATH") ?? "data/knowledge.db",
+  refreshHours: envInt("GROVE_KNOWLEDGE_REFRESH_HOURS", 6),
+  sources: KNOWLEDGE_SOURCES,
+} as const;
+
+export const MODERATION = {
+  // Repeat explicit questions inside the window get a timeout, longer each time.
+  explicitTimeouts: envFlag("GROVE_EXPLICIT_TIMEOUTS", true),
+  timeoutMinutes: [10, 60],
+  strikeWindowMs: 24 * 60 * 60_000,
 } as const;

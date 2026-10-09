@@ -46,6 +46,16 @@ const MIGRATIONS: readonly string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  CREATE TABLE IF NOT EXISTS grove_strikes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS grove_strikes_by_user ON grove_strikes (user_id, kind, at);
+  `,
 ];
 
 export function openDatabase(path: string): Db {

@@ -106,9 +106,9 @@ export const TOOL_COMMANDS: readonly Command[] = [
         );
       }
 
-      const threadName = match[1].trim();
-      const reportMessage = match[2].trim();
-      const tag = match[3].toLowerCase() as keyof typeof REPORT_TAG_IDS;
+      const threadName = match[1]!.trim();
+      const reportMessage = match[2]!.trim();
+      const tag = match[3]!.toLowerCase() as keyof typeof REPORT_TAG_IDS;
       const imageLink = match[4]?.trim();
 
       if (threadName.length > 100) {

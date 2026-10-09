@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import Database from "better-sqlite3";
 import { CustomCommandStore } from "../src/db/customCommands.ts";
 import { openDatabase } from "../src/db/database.ts";
-import { SqliteMemory } from "../src/db/groveMemory.ts";
+import { StrikeStore } from "../src/db/strikes.ts";
 import { ModmailLinks, SuggestionClaims } from "../src/db/threadLinks.ts";
 
 describe("database", () => {
@@ -29,7 +29,7 @@ describe("database", () => {
       assert.equal(new CustomCommandStore(db).get("!rules")?.out, "Be nice!");
       assert.equal(new SuggestionClaims(db).claimant("t1"), "u1");
       assert.equal(new ModmailLinks(db).userOf("t2"), "u2");
-      assert.equal(db.pragma("user_version", { simple: true }), 1);
+      assert.equal(db.pragma("user_version", { simple: true }), 2);
       db.close();
 
       const reopened = openDatabase(path);
@@ -58,13 +58,12 @@ describe("database", () => {
     assert.equal(new ModmailLinks(db).threadOf("user"), undefined);
   });
 
-  it("remembers friends, misses and state for Grove", () => {
-    const memory = new SqliteMemory(openDatabase(":memory:"));
-    memory.save({ userId: "u", name: "Sam", nickname: "sammy", firstSeen: 1, lastSeen: 2, talks: 3, affinity: 0.5, likes: ["moss"], lastTopic: "jam" });
-    assert.deepEqual(memory.friend("u"), { userId: "u", name: "Sam", nickname: "sammy", firstSeen: 1, lastSeen: 2, talks: 3, affinity: 0.5, likes: ["moss"], lastTopic: "jam" });
-    for (let i = 0; i < 520; i++) memory.noteMiss("c", "u", `miss ${i}`, i);
-    assert.equal(memory.recentMisses(3)[0]?.text, "miss 519");
-    memory.saveState("mood", "{}");
-    assert.equal(memory.loadState("mood"), "{}");
+  it("counts strikes inside their window only", () => {
+    const strikes = new StrikeStore(openDatabase(":memory:"));
+    const day = 24 * 60 * 60_000;
+    assert.equal(strikes.add("u", 1_000, "explicit", "first", day), 1);
+    assert.equal(strikes.add("u", 2_000, "explicit", "second", day), 2);
+    assert.equal(strikes.add("other", 2_500, "explicit", "someone else", day), 1);
+    assert.equal(strikes.add("u", 2_000 + 2 * day, "explicit", "much later", day), 1);
   });
 });

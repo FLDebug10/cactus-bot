@@ -1,8 +1,11 @@
 import type { Client, Message, MessageReplyOptions } from "discord.js";
-import type { Grove } from "../brain/grove.ts";
 import type { CustomCommandStore } from "../db/customCommands.ts";
 import type { ModmailLinks, SuggestionClaims } from "../db/threadLinks.ts";
+import type { GroveChat } from "../features/chat.ts";
 import type { Modmail } from "../features/modmail.ts";
+import type { BrainChain } from "../grove/brain.ts";
+import type { KnowledgeStore } from "../grove/knowledge/store.ts";
+import type { KnowledgeSync } from "../grove/knowledge/sync.ts";
 
 export interface Services {
   client: Client;
@@ -10,7 +13,10 @@ export interface Services {
   claims: SuggestionClaims;
   modmailLinks: ModmailLinks;
   modmail: Modmail;
-  grove: Grove;
+  chat: GroveChat;
+  brain: BrainChain;
+  knowledge: KnowledgeStore | null;
+  knowledgeSync: KnowledgeSync | null;
 }
 
 export interface CommandContext {

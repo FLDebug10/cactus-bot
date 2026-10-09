@@ -1,7 +1,9 @@
 import type { Message } from "discord.js";
 import { COMMAND_PREFIX, EMOJI } from "../config.ts";
+import type { CustomCommandStore } from "../db/customCommands.ts";
 import { isStaff } from "../discord/members.ts";
 import { logger } from "../logger.ts";
+import { BRAIN_COMMANDS } from "./brain.ts";
 import type { Command, Services } from "./command.ts";
 import { INFO_COMMANDS } from "./info.ts";
 import { SILLY_COMMANDS } from "./silly.ts";
@@ -17,7 +19,7 @@ const help: Command = {
   run: ({ message, services }) => message.reply({ content: helpText(services).slice(0, 2000), allowedMentions: { parse: [] } }),
 };
 
-const COMMANDS: readonly Command[] = [help, ...INFO_COMMANDS, ...TOOL_COMMANDS, ...STAFF_COMMANDS, ...SILLY_COMMANDS];
+const COMMANDS: readonly Command[] = [help, ...INFO_COMMANDS, ...TOOL_COMMANDS, ...BRAIN_COMMANDS, ...STAFF_COMMANDS, ...SILLY_COMMANDS];
 
 const BY_NAME = new Map<string, Command>();
 for (const command of COMMANDS) {
@@ -32,7 +34,18 @@ function label(command: Command): string {
   return [command.name, ...(command.aliases ?? [])].map(name => `\`${COMMAND_PREFIX}${name}\``).join(" / ");
 }
 
-// The !help list. Grove also sends it when someone asks what commands it has.
+// What Grove's brain is told it can point people to: "!name: what it does".
+export function commandSummary(customCommands: CustomCommandStore): string[] {
+  const everyone = COMMANDS.filter(command => !command.hidden && !command.staffOnly);
+  const custom = customCommands.all().slice(0, 15);
+  return [
+    "!help: lists every command",
+    ...everyone.map(command => `${command.usage ?? `${COMMAND_PREFIX}${command.name}`}: ${command.description}`),
+    ...custom.map(command => `${command.cmd}: ${command.help.replace(/\s+/g, " ").slice(0, 80)}`),
+  ];
+}
+
+// The !help list.
 export function helpText(services: Services): string {
   const everyone = COMMANDS.filter(command => !command.hidden && !command.staffOnly);
   const staff = COMMANDS.filter(command => !command.hidden && command.staffOnly);
@@ -44,7 +57,7 @@ export function helpText(services: Services): string {
     ...everyone.map(command => `- ${label(command)}: ${command.description}`),
     ...custom.map(command => `- \`${command.cmd}\`: ${command.help}`),
     "",
-    "🌱 **Not a command?** Say my name, mention me, or reply to one of my messages and we can chat! Bugs, datapacks, addons, jams, the mods, or just how my day is going are all fair game.",
+    "🌱 **Not a command?** Say my name, mention me, or reply to one of my messages and we can chat! Datapacks, addons, the mods, jams, or just how my day is going are all fair game. My chatting brain naps sometimes (check with `!brain`), but commands always work.",
     "",
     "🔒 **Contributor / Staff Commands**",
     ...staff.map(command => `- ${label(command)}: ${command.description}`),

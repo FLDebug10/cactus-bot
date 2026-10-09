@@ -3,6 +3,10 @@ services:
     image: ghcr.io/fldebug10/cactus-bot:master
     container_name: cactus-bot
     restart: unless-stopped
+    # Grove's brain arrives on the VM's own 127.0.0.1:11434 through an SSH
+    # tunnel from Overgrown's computer, so the bot shares the VM's network.
+    # Grove opens no ports, so this exposes nothing.
+    network_mode: host
     env_file:
       - .env
     environment:

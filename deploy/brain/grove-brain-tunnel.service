@@ -1,0 +1,32 @@
+# Lets Grove's VM reach the Ollama on this computer, through SSH.
+# The VM gets 127.0.0.1:11434 forwarded here. Nothing else can reach it.
+#
+# Install (as your normal user, not root):
+#   cp deploy/brain/grove-brain-tunnel.service ~/.config/systemd/user/
+#   edit VM_HOST and VM_USER below
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now grove-brain-tunnel
+# Logs: journalctl --user -u grove-brain-tunnel -f
+
+[Unit]
+Description=Tunnel Grove's brain (Ollama) to the bot's VM
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=VM_HOST=your-vm-ip-or-hostname
+Environment=VM_USER=your-vm-user
+ExecStart=/usr/bin/ssh -N -T \
+  -i %h/.ssh/grove_brain \
+  -o IdentitiesOnly=yes \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=accept-new \
+  -R 127.0.0.1:11434:127.0.0.1:11434 \
+  ${VM_USER}@${VM_HOST}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

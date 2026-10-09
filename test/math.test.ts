@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mathIn, prettyExpression, solveMath, spokenValue } from "../src/brain/understand/arithmetic.ts";
+import { mathIn, prettyExpression, solveMath, spokenValue } from "../src/grove/arithmetic.ts";
 
 function answer(text: string) {
   const problem = mathIn(text);

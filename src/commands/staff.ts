@@ -92,7 +92,7 @@ export const STAFF_COMMANDS: readonly Command[] = [
     staffOnly: true,
     run: ({ message, args, services }) => {
       const minutes = Math.min(24 * 60, Math.max(1, Number.parseInt(args, 10) || 30));
-      services.grove.hush(message.channelId, minutes);
+      services.chat.hush(message.channelId, minutes);
       return message.reply(`okay! i'll stay quiet in here for ${minutes} minute${minutes === 1 ? "" : "s"} 🤐`);
     },
   },
@@ -101,19 +101,8 @@ export const STAFF_COMMANDS: readonly Command[] = [
     description: "Lets me chat in this channel again",
     staffOnly: true,
     run: ({ message, services }) => {
-      services.grove.hush(message.channelId, 0);
+      services.chat.hush(message.channelId, 0);
       return message.reply("yay, i can talk again!");
-    },
-  },
-  {
-    name: "misses",
-    description: "Lists recent things people said to me that I didn't understand",
-    staffOnly: true,
-    run: ({ message, services }) => {
-      const misses = services.grove.misses(10);
-      if (misses.length === 0) return message.reply("i understood everything lately! (or nobody talked to me)");
-      const lines = misses.map(miss => `<t:${Math.floor(miss.at / 1000)}:R> ${miss.text.replace(/<@[!&]?\d+>/g, "@…").replace(/\s+/g, " ").slice(0, 150)}`);
-      return message.reply({ content: `**Things i didn't understand**\n${lines.join("\n")}`.slice(0, 2000), allowedMentions: { parse: [] } });
     },
   },
 ];

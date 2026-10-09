@@ -1,91 +1,111 @@
 // Talk to Grove's brain in the terminal, no Discord needed:  npm run chat
+// It uses the same persona, notes, tools, reflexes and brains as the bot: the
+// Ollama in GROVE_BRAIN_URL (default http://127.0.0.1:11434), plus Ollama's cloud
+// when GROVE_CLOUD_API_KEY is set.
 //
-//   hello grove              say something as "you"
-//   > that's funny            reply to Grove's last message
-//   @sam: grove are you ok    say something as someone else (they join the channel)
-//   @sam:> lol                someone else replies to Grove's last message
-//   /wait 30                  let 30 seconds pass
-//   /quit                     leave
-//
-// "@grove" in a message counts as an @mention.
+//   how do i make a resource bar     say something to Grove as "you"
+//   @sam: grove are you a cactus     say something as someone else
+//   /sync                            download the Handbook + source library (first run)
+//   /notes                           show which Handbook notes the last reply got
+//   /quit                            leave
 
+import "dotenv/config";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { Grove } from "../src/brain/grove.ts";
-import { InMemoryMemory } from "../src/brain/state/memory.ts";
-import type { ChatMessage } from "../src/brain/types.ts";
+import { KNOWLEDGE, SETTINGS } from "../src/config.ts";
+import { brainsFromConfig } from "../src/grove/brains.ts";
+import { History } from "../src/grove/history.ts";
+import { KnowledgeStore, type SearchHit } from "../src/grove/knowledge/store.ts";
+import { KnowledgeSync } from "../src/grove/knowledge/sync.ts";
+import { persona, rightNow } from "../src/grove/persona.ts";
+import { buildPrompt } from "../src/grove/prompt.ts";
+import { asksAboutExplosives, explicitMatch, explicitReply } from "../src/grove/reflexes.ts";
+import { groveTools } from "../src/grove/tools.ts";
+import type { ChannelInfo, ChatLine } from "../src/grove/types.ts";
+import { voice } from "../src/grove/voice.ts";
+import { logger } from "../src/logger.ts";
 
-const GROVE_ID = "100000000000000001";
-let now = Date.now();
+const CHANNEL = "terminal";
+const channels: ChannelInfo[] = [
+  { key: "bugReports", id: "1", name: "bug-reports", purpose: "report bugs in Apoli, Origins or the Handbook" },
+  { key: "suggestions", id: "2", name: "suggestions", purpose: "ideas and feature requests" },
+  { key: "datapackSupport", id: "3", name: "datapack-support", purpose: "help with making powers and datapacks" },
+  { key: "addonSupport", id: "4", name: "addon-support", purpose: "help with Java addons" },
+];
+
+const knowledge = new KnowledgeStore(KNOWLEDGE.path);
+const sync = new KnowledgeSync(knowledge, KNOWLEDGE.sources, { log: logger("knowledge") });
+const brain = brainsFromConfig(logger("brain"));
+const tools = groveTools(knowledge);
+const history = new History();
+const personaText = persona({ channels, commands: ["!help: lists every command", "!rbr: points to bug reports", "!report [title] [message] [Apoli/Origins/Wiki]: makes a bug report post"] });
+
 let nextId = 1;
-let lastGroveMessage: { id: string } | null = null;
+let strikes = 0;
+let lastNotes: SearchHit[] = [];
 
-const grove = new Grove({ memory: new InMemoryMemory(), timezone: process.env["GROVE_TIMEZONE"] ?? "America/New_York", clock: { now: () => now } });
-grove.setIdentity(GROVE_ID);
-
-const users = new Map<string, string>();
-function userId(name: string): string {
-  let id = users.get(name);
-  if (id === undefined) {
-    id = `2${String(users.size + 1).padStart(17, "0")}`;
-    users.set(name, id);
-  }
-  return id;
+function line(author: string, content: string, isGrove = false): ChatLine {
+  return { id: String(nextId++), channelId: CHANNEL, authorId: isGrove ? "grove" : author, authorName: author, isGrove, isBot: isGrove, content, at: Date.now(), replyToId: null };
 }
 
-function send(author: string, text: string, replyToGrove: boolean): void {
-  now += 3_000;
-  const content = text.replace(/@grove\b/gi, `<@${GROVE_ID}>`);
-  const message: ChatMessage = {
-    id: String(nextId++),
-    channelId: "terminal",
-    parentId: null,
-    authorId: userId(author),
-    authorName: author,
-    authorIsBot: false,
-    content,
-    createdAt: now,
-    replyToId: replyToGrove && lastGroveMessage !== null ? lastGroveMessage.id : null,
-    replyToAuthorId: replyToGrove && lastGroveMessage !== null ? GROVE_ID : null,
-    mentionsGrove: content.includes(`<@${GROVE_ID}>`),
-    mentionedUserIds: [],
-    hasMedia: false,
-  };
-  grove.observe(message);
-  const decision = grove.consider(message);
-  if (decision === null) {
-    console.log("   (grove stays quiet)");
-    return;
-  }
-  if (decision.waitForSilenceMs > 0) console.log(`   (grove waits ${decision.waitForSilenceMs / 1000}s to see if a person answers first)`);
-  now += decision.waitForSilenceMs + decision.delayMs;
-
-  let sentId: string | null = null;
-  if (decision.text !== null) {
-    sentId = String(nextId++);
-    grove.observe({ ...message, id: sentId, authorId: GROVE_ID, authorName: "Grove", authorIsBot: true, content: decision.text, replyToId: message.id, replyToAuthorId: message.authorId, mentionsGrove: false, createdAt: now });
-    lastGroveMessage = { id: sentId };
-    console.log(`grove: ${decision.text}`);
-    if (decision.command !== null) console.log(`   (sends the !${decision.command} list instead)`);
-  }
-  if (decision.files.length > 0) console.log(`   (attaches ${decision.files.join(", ")})`);
-  if (decision.reactions.length > 0) console.log(`   (reacts ${decision.reactions.join(" ")})`);
-  grove.didSay(decision, sentId, now);
-  console.log(`   [${decision.meta.act}${decision.meta.topic ? `, ${decision.meta.topic}` : ""}]`);
+for (const status of await brain.check()) {
+  console.log(`${status.name} brain ${status.online ? `online: ${status.model} (${status.capabilities.join(", ")})${status.credits !== null ? `, ${status.credits}` : ""}` : `offline: ${status.reason}`}`);
 }
+if (knowledge.isEmpty()) console.log("the library is empty, type /sync to download the handbook and source (about a minute)");
+brain.stop();
 
-const terminal = createInterface({ input: stdin, output: stdout, prompt: "you: " });
-console.log("talk to grove! '>' replies to grove, '@name: text' speaks as someone else, /wait N, /quit");
-terminal.prompt();
-for await (const raw of terminal) {
-  const line = raw.trim();
-  if (line === "/quit" || line === "/exit") break;
-  const wait = /^\/wait\s+(\d+)/.exec(line);
-  const other = /^@([\w-]+):(>?)\s*(.+)$/.exec(line);
-  if (wait !== null) now += Number(wait[1]) * 1000;
-  else if (other !== null) send(other[1]!, other[3]!, other[2] === ">");
-  else if (line.startsWith(">")) send("you", line.slice(1).trim(), true);
-  else if (line.length > 0) send("you", line, false);
-  terminal.prompt();
+const rl = createInterface({ input: stdin, output: stdout });
+for (;;) {
+  const input = (await rl.question("> ")).trim();
+  if (input.length === 0) continue;
+  if (input === "/quit") break;
+  if (input === "/sync") {
+    for (const result of await sync.syncAll(true)) console.log(`  ${result.source}: ${result.status}${result.files !== undefined ? ` (${result.files} files)` : ""}${result.error !== undefined ? ` ${result.error}` : ""}`);
+    continue;
+  }
+  if (input === "/notes") {
+    console.log(lastNotes.length === 0 ? "  (no notes)" : lastNotes.map(note => `  ${note.title} ${note.url}`).join("\n"));
+    continue;
+  }
+
+  const other = /^@(\w+):\s*(.*)$/.exec(input);
+  const author = other?.[1] ?? "you";
+  const target = line(author, other?.[2] ?? input);
+  const transcript = history.before(CHANNEL, target.id, 16, 45 * 60_000);
+  history.add(target);
+
+  if (explicitMatch(target.content) !== null) {
+    strikes++;
+    console.log(`grove: ${explicitReply(strikes, strikes >= 2 ? 10 : null)}  [explicit, strike ${strikes}]`);
+    continue;
+  }
+  if (asksAboutExplosives(target.content)) {
+    console.log("grove: here's the only bomb recipe i know! 5 gunpowder and 4 sand  [+ minecraft_tnt_crafting_recipe.png]");
+    continue;
+  }
+
+  lastNotes = knowledge.isEmpty() ? [] : knowledge.search(target.content, { kind: "docs", limit: 3 });
+  const prompt = buildPrompt({
+    persona: personaText,
+    moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0 }),
+    notes: lastNotes,
+    transcript,
+    target,
+    replyTo: null,
+    attachments: [],
+  });
+  try {
+    await brain.check();
+    const reply = await brain.reply({ system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3 });
+    const text = voice(reply.text, { channels }) ?? "(stays quiet)";
+    history.add(line("grove", text, true));
+    console.log(`grove: ${text}`);
+    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}]`);
+  } catch (error) {
+    console.log(`  (the brain didn't answer: ${error instanceof Error ? error.message : String(error)})`);
+  } finally {
+    brain.stop();
+  }
 }
-terminal.close();
+rl.close();
+knowledge.close();
