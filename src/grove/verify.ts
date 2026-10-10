@@ -7,6 +7,7 @@
 // action or a condition says which kind (see knowledge/schema.ts). Grove gets
 // one chance to fix what's found, and what it still can't back up is left out.
 
+import { readRequest } from "./builder/reading.ts";
 import {
   type CommandInfo,
   type DataInfo,
@@ -407,10 +408,81 @@ function tickProblems(words: string): Problem[] {
   return problems;
 }
 
+// Every object in the reply's json blocks.
+function jsonNodes(text: string): Array<Record<string, unknown>> {
+  const nodes: Array<Record<string, unknown>> = [];
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+    nodes.push(node as Record<string, unknown>);
+    Object.values(node).forEach(visit);
+  };
+  for (const block of blocksIn(text)) {
+    const parsed = looseJson(block);
+    if (!("error" in parsed)) visit(parsed.value);
+  }
+  return nodes;
+}
+
+const typeOf = (node: Record<string, unknown>) => (typeof node.type === "string" ? node.type.toLowerCase().replace(/^origins:/, "apoli:") : "");
+
+// Hearts said in prose, but not the ones in a condition ("below 5 hearts").
+const HEARTS_SAID = /(?<!(?:below|under|than|at|to)\s)\b(\d+(?:\.\d+)?)\s*(?:full\s+)?hearts?\b/gi;
+// Fields that are always in ticks. ("duration" isn't: set_on_fire's is in seconds.)
+const TIMED_FIELDS = ["cooldown", "interval"] as const;
+// "20 ticks = 1 second" explains the unit, it doesn't describe the file.
+const UNIT_RULE = "(?!\\s*(?:=|is|are|equals|make up|per)\\s*(?:1|one|a)\\s*second)";
+
+// What the reply says about its own json that the json doesn't do: "heals you 5
+// hearts" for "amount": 5 (health points, so 2.5 hearts), "the cooldown is 500 ticks"
+// for "cooldown": 100. A small model gets these wrong describing the file it just wrote.
+function claimProblems(text: string, words: string): Problem[] {
+  const nodes = jsonNodes(text);
+  const problems: Problem[] = [];
+  const amounts = nodes.filter(node => (typeOf(node) === "apoli:heal" || typeOf(node) === "apoli:damage") && typeof node.amount === "number").map(node => node.amount as number);
+  for (const match of words.matchAll(HEARTS_SAID)) {
+    const hearts = Number(match[1]);
+    if (!amounts.includes(hearts) || amounts.includes(hearts * 2)) continue;
+    problems.push({ at: "", text: `"amount" is in health points (2 = one heart), so "amount": ${hearts} is ${hearts / 2} hearts, not ${hearts}. For ${hearts} hearts it's "amount": ${hearts * 2}.` });
+    break;
+  }
+  for (const field of TIMED_FIELDS) {
+    const values = nodes.flatMap(node => (typeof node[field] === "number" ? [node[field] as number] : []));
+    if (values.length === 0) continue;
+    const said = new RegExp(`\\b${field}\\b[^.!?\\n]{0,30}?(?<!=\\s*)\\b(\\d+(?:\\.\\d+)?)\\s*(ticks?|seconds?|secs?)\\b${UNIT_RULE}|(?<!=\\s*)\\b(\\d+(?:\\.\\d+)?)[ -]?(ticks?|seconds?|secs?)${UNIT_RULE}\\s+${field}\\b`, "gi");
+    for (const match of words.matchAll(said)) {
+      const number = Number(match[1] ?? match[3]);
+      const unit = (match[2] ?? match[4])!.toLowerCase();
+      const ticks = unit.startsWith("tick") ? number : number * 20;
+      if (values.some(value => Math.abs(value - ticks) < 0.5)) continue;
+      problems.push({ at: "", text: `you wrote a ${field} of ${number} ${unit}, but the json has "${field}": ${values[0]}, which is ${values[0]! / 20} seconds (20 ticks = 1 second). Say what the json does.` });
+      break;
+    }
+  }
+  return problems;
+}
+
+// The json saying the opposite of what they asked: "only at night" with a daytime
+// condition that isn't inverted. Read off their message the way the power builder reads it.
+function askedProblems(question: string, text: string): Problem[] {
+  const wanted = readRequest(question).conditions;
+  const night = wanted.includes("night") && !wanted.includes("day");
+  const day = wanted.includes("day") && !wanted.includes("night");
+  if (!night && !day) return [];
+  const flipped = jsonNodes(text).some(node => typeOf(node) === "apoli:daytime" && (night ? node.inverted !== true : node.inverted === true));
+  if (!flipped) return [];
+  return [{ at: "", text: night
+    ? 'they asked for night: that\'s { "type": "apoli:daytime", "inverted": true }. apoli:daytime on its own passes during the day.'
+    : 'they asked for the day: that\'s { "type": "apoli:daytime" } without "inverted".' }];
+}
+
 // Made-up ids, dead links and conversions that don't add up in what the reply says.
 export function proseProblems(text: string, schema: Schema): Problem[] {
   const words = prose(text);
-  const problems: Problem[] = tickProblems(words);
+  const problems: Problem[] = [...tickProblems(words), ...claimProblems(text, words)];
   for (const match of new Set([...words.matchAll(PROSE_ID)].map(found => found[1]!.toLowerCase()))) {
     if (known(schema, match)) continue;
     const text = PLACEHOLDER_ID.test(match)
@@ -514,11 +586,12 @@ export function commandProblems(text: string, schema: Schema): Problem[] {
 }
 
 // Every problem in a reply: its json, its commands, and the ids and links it mentions.
-export function problemsIn(text: string, schema: Schema): Problem[] {
+// Everything wrong with a reply. With their message, also json that says the opposite of what they asked.
+export function problemsIn(text: string, schema: Schema, question?: string): Problem[] {
   if (!hasTypes(schema)) return [];
   const blocks = blocksIn(text);
   const inJson = blocks.flatMap((block, index) => problemsInBlock(block, schema).map(problem => (blocks.length > 1 ? { ...problem, at: `block ${index + 1}${problem.at.length > 0 ? ` ${problem.at}` : ""}` } : problem)));
-  return [...inJson, ...commandProblems(text, schema), ...proseProblems(text, schema)];
+  return [...inJson, ...commandProblems(text, schema), ...proseProblems(text, schema), ...(question === undefined ? [] : askedProblems(question, text))];
 }
 
 // The reply without the sentences that name a made-up id or a dead link (code blocks are left to withoutBadBlocks).
@@ -564,22 +637,24 @@ function inventedIds(block: string, schema: Schema): boolean {
 }
 
 // Whether a code block still has mistakes: json that doesn't hold up, or commands written wrong.
-function badBlock(language: string, body: string, schema: Schema): boolean {
+function badBlock(language: string, body: string, schema: Schema, question?: string): boolean {
   if (!JSON_LANGUAGES.has(language.toLowerCase()) || !/^\s*[{["]/.test(body)) return commandProblems(`\`\`\`${language}\n${body}\`\`\``, schema).length > 0;
   const parsed = looseJson(body);
-  return "error" in parsed ? inventedIds(body, schema) : problemsInBlock(body, schema).length > 0;
+  if ("error" in parsed) return inventedIds(body, schema);
+  return problemsInBlock(body, schema).length > 0 || (question !== undefined && askedProblems(question, `\`\`\`json\n${body}\n\`\`\``).length > 0);
 }
 
 // The answer without the code blocks that still have mistakes in them, and without the
 // sentence that led into each one ("here's how that looks:").
-export function withoutBadBlocks(text: string, schema: Schema): { text: string; removed: number } {
+// With their message, a block that says the opposite of what they asked goes too.
+export function withoutBadBlocks(text: string, schema: Schema, question?: string): { text: string; removed: number } {
   let removed = 0;
   let out = "";
   let last = 0;
   for (const match of text.matchAll(FENCE)) {
     out += text.slice(last, match.index);
     last = match.index + match[0].length;
-    if (!badBlock(match[1]!, match[2]!, schema)) {
+    if (!badBlock(match[1]!, match[2]!, schema, question)) {
       out += match[0];
       continue;
     }

@@ -21,6 +21,8 @@ export interface PromptInput {
   budget?: { transcript?: number; notes?: number; attachments?: number };
   // A follow-up may be for someone else, so it isn't told to answer.
   followup?: boolean;
+  // The notes open with a power built for this message.
+  power?: boolean;
 }
 
 export interface Prompt {
@@ -70,9 +72,10 @@ function notesBlock(notes: readonly Note[] | null, budget: number): string {
 const WANTS_JSON = /\b(?:examples?|json|make|create|write|build|give me|power that|how (?:do|would|can|could) (?:i|you|we)|how to)\b/i;
 
 // Said on their message, where a small model looks hardest: the looking up is done, answer.
-function answerNote(notes: readonly Note[] | null, question: string, followup: boolean): string {
+function answerNote(notes: readonly Note[] | null, question: string, followup: boolean, power: boolean): string {
   if (notes === null || notes.length === 0) return "";
   const when = followup ? "if this is for you, " : "";
+  if (power) return `\n\n[note to grove: ${when}their power is already built and checked, and it goes out right under your message with what it does and the handbook link. write one short, fun line in your own voice reacting to their idea as you hand it over. no numbers, no json, and don't explain how it works.]`;
   if (wantsSource(question)) return `\n\n[note to grove: ${when}your REFERENCE NOTES already have the code for this. answer it now from them, name the java file and link it.]`;
   const json = WANTS_JSON.test(question) ? ", with json built from the page's example" : "";
   return `\n\n[note to grove: ${when}your REFERENCE NOTES already have the handbook pages for this. answer it now from them${json}, and link the page you used.]`;
@@ -137,7 +140,7 @@ export function buildPrompt(input: PromptInput): Prompt {
   const content = target.content.trim().length === 0 ? "(no text)" : squash(target.content, 2_000);
   messages.push({
     role: "user",
-    content: `${label(target, known)}: ${content}${attachmentBlock(input.attachments, budget.attachments)}${answerNote(input.notes, target.content, input.followup === true)}`,
+    content: `${label(target, known)}: ${content}${attachmentBlock(input.attachments, budget.attachments)}${answerNote(input.notes, target.content, input.followup === true, input.power === true)}`,
   });
   return { system, messages, sampling: input.notes !== null ? HELP_SAMPLING : {} };
 }

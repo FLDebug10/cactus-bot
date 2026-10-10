@@ -67,6 +67,8 @@ export interface BrainRequest {
   // Sampling for this reply. Unset: 0.7, and the model's own presence penalty.
   temperature?: number;
   presencePenalty?: number;
+  // A JSON schema the reply has to follow (Ollama's structured output).
+  format?: Record<string, unknown>;
 }
 
 export interface BrainReply {
@@ -349,6 +351,7 @@ export class Brain {
           messages,
           stream: false,
           ...(offerTools ? { tools: request.tools!.definitions } : {}),
+          ...(request.format !== undefined ? { format: request.format } : {}),
           ...(think !== undefined ? { think } : {}),
           ...(this.options.keepAlive !== null ? { keep_alive: this.options.keepAlive } : {}),
           options: {

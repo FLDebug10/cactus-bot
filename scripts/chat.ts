@@ -14,6 +14,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { codeSourcesOf, KNOWLEDGE, MAIN_BUILD, SETTINGS } from "../src/config.ts";
 import { brainsFromConfig } from "../src/grove/brains.ts";
+import { buildPower, powerNote, replyWithPower } from "../src/grove/builder/build.ts";
 import { checkedReply } from "../src/grove/checked.ts";
 import { History } from "../src/grove/history.ts";
 import { KnowledgeStore } from "../src/grove/knowledge/store.ts";
@@ -90,27 +91,28 @@ async function handle(input: string): Promise<boolean> {
 
   const schema = knowledge.isEmpty() ? null : knowledge.schema(codeSourcesOf(MAIN_BUILD));
   lastNotes = schema === null ? null : gatherNotes(knowledge, notesQuery(target, null, transcript), { codeSources: codeSourcesOf(MAIN_BUILD), schema });
-  const prompt = buildPrompt({
-    persona: personaText,
-    moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0, gif: target.content.includes("[gif") }),
-    notes: lastNotes,
-    transcript,
-    target,
-    replyTo: null,
-    attachments: [],
-  });
   try {
     await brain.check();
-    const reply = await checkedReply(
-      brain,
-      { system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3, toolBudget: 4_000, followThrough: text => promisedLookup(text, target.content), ...prompt.sampling },
-      schema,
-      { mainType: mainTypeOf(lastNotes), hints: hintsOf(lastNotes) },
-    );
+    const power = schema === null ? null : await buildPower(brain, target, transcript, schema);
+    if (power !== null) lastNotes = [powerNote(power), ...(lastNotes ?? [])];
+    const prompt = buildPrompt({
+      persona: personaText,
+      moment: rightNow({ now: Date.now(), timezone: SETTINGS.timezone, channel: "general", thread: null, threadStarter: null, speaker: { id: author, name: author, crew: null, staff: false }, addressing: "direct", imageCount: 0, gif: target.content.includes("[gif") }),
+      notes: lastNotes,
+      transcript,
+      target,
+      replyTo: null,
+      attachments: [],
+      power: power !== null,
+    });
+    const request = { system: prompt.system, messages: prompt.messages, tools, maxToolRounds: 3, toolBudget: 4_000, followThrough: (text: string) => promisedLookup(text, target.content), ...prompt.sampling };
+    const reply = power !== null
+      ? { ...(await replyWithPower(brain, request, power)), corrected: false, problems: [] as string[] }
+      : await checkedReply(brain, request, schema, { mainType: mainTypeOf(lastNotes), hints: hintsOf(lastNotes), question: target.content });
     const text = voice(reply.text, { channels }) ?? "(stays quiet)";
     history.add(line("grove", text, true));
     console.log(splitMessage(text).map(piece => `grove: ${piece}`).join("\n  [next message]\n"));
-    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}]`);
+    console.log(`  [${reply.brain} ${reply.model}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${power !== null ? `, built ${String(power.power.type)}` : ""}${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}]`);
     for (const problem of reply.problems) console.log(`  [first json: ${problem}]`);
   } catch (error) {
     console.log(`  (the brain didn't answer: ${error instanceof Error ? error.message : String(error)})`);

@@ -5,6 +5,7 @@ import type { StrikeStore } from "../db/strikes.ts";
 import { isStaff } from "../discord/members.ts";
 import { addressingOf } from "../grove/addressing.ts";
 import { type BrainChain, BrainUnavailable, type ToolBox } from "../grove/brain.ts";
+import { buildPower, powerNote, replyWithPower } from "../grove/builder/build.ts";
 import { checkedReply } from "../grove/checked.ts";
 import { History } from "../grove/history.ts";
 import type { Schema } from "../grove/knowledge/schema.ts";
@@ -285,6 +286,11 @@ export class GroveChat {
       const images = BRAIN.vision && this.options.brain.can("vision") ? await readImages(message) : [];
       const schema = this.schema();
       const notes = this.notesFor(merged, replyTo, transcript, schema);
+      // Asked for a power: it is put together from the Handbook's types before Grove writes a word.
+      const power = schema === null ? null : await buildPower(this.options.brain, merged, transcript, schema).catch(error => {
+        if (!(error instanceof BrainUnavailable)) log.warn("could not build the power", error);
+        return null;
+      });
 
       const prompt = buildPrompt({
         persona: this.personaText,
@@ -299,29 +305,28 @@ export class GroveChat {
           imageCount: images.length,
           gif: merged.content.includes("[gif"),
         }),
-        notes,
+        notes: power === null ? notes : [powerNote(power), ...(notes ?? [])],
         transcript,
         target: merged,
         replyTo,
         attachments,
         followup: job.addressing === "followup",
+        power: power !== null,
       });
 
-      const reply = await checkedReply(
-        this.options.brain,
-        {
-          system: prompt.system,
-          messages: prompt.messages,
-          images,
-          tools: this.tools,
-          maxToolRounds: 3,
-          toolBudget: TOOL_CHARS,
-          followThrough: text => promisedLookup(text, merged.content),
-          ...prompt.sampling,
-        },
-        schema,
-        { mainType: mainTypeOf(notes), hints: hintsOf(notes) },
-      );
+      const request = {
+        system: prompt.system,
+        messages: prompt.messages,
+        images,
+        tools: this.tools,
+        maxToolRounds: 3,
+        toolBudget: TOOL_CHARS,
+        followThrough: (text: string) => promisedLookup(text, merged.content),
+        ...prompt.sampling,
+      };
+      const reply = power !== null
+        ? { ...(await replyWithPower(this.options.brain, request, power)), corrected: false, problems: [] }
+        : await checkedReply(this.options.brain, request, schema, { mainType: mainTypeOf(notes), hints: hintsOf(notes), question: merged.content });
       for (const line of [target, ...extra]) this.covered.add(line.id);
       let text = voice(reply.text, { channels: this.channelList });
       if (text === null) {
@@ -341,7 +346,7 @@ export class GroveChat {
         if (message.channel.isSendable()) await message.channel.send({ content: more, allowedMentions: { parse: [] } });
       }
       this.history.noteAnswered(message.channelId, message.author.id, Date.now());
-      const tools = `${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}`;
+      const tools = `${power !== null ? `, built ${String(power.power.type)}` : ""}${reply.toolCalls.length > 0 ? `, tools: ${reply.toolCalls.join(" ")}` : ""}${reply.corrected ? ", fixed its json" : ""}`;
       log.info(`answered ${target.authorName} in ${message.channelId} with the ${reply.brain} brain (${job.addressing}, ${reply.ms} ms, ${reply.promptTokens}+${reply.replyTokens} tokens${tools})`);
       if (reply.problems.length > 0) log.info(`its first json had: ${reply.problems.join(" | ")}`);
     } finally {

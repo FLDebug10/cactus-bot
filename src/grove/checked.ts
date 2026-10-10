@@ -30,6 +30,8 @@ export interface CheckOptions {
   // The checked hints for what was asked ("only at night: daytime, inverted"), said
   // when Grove's own json had to go, so the one thing that matters still gets across.
   hints?: readonly string[];
+  // Their message, to hold the json to what it asked for.
+  question?: string;
 }
 
 // The last message with a note to Grove added to it: the draft and what to fix.
@@ -79,7 +81,7 @@ export function handbookExample(schema: Schema, ids: ReadonlyArray<string | null
 export async function checkedReply(brain: Pick<BrainChain, "reply">, request: BrainRequest, schema: Schema | null, options: CheckOptions = {}): Promise<Checked> {
   const first = await brain.reply(request);
   if (schema === null) return { ...first, corrected: false, problems: [] };
-  const problems = problemsIn(first.text, schema);
+  const problems = problemsIn(first.text, schema, options.question);
   if (problems.length === 0) return { ...first, corrected: false, problems: [] };
 
   let second: BrainReply;
@@ -101,10 +103,10 @@ export async function checkedReply(brain: Pick<BrainChain, "reply">, request: Br
     corrected: true,
     problems: problems.map(problem => `${problem.at.length > 0 ? `${problem.at}: ` : ""}${problem.text}`),
   };
-  if (problemsIn(merged.text, schema).length === 0) return merged;
+  if (problemsIn(merged.text, schema, options.question).length === 0) return merged;
 
   // Still wrong: keep what holds up, and put the real example where the made-up json was.
-  const blocks = withoutBadBlocks(merged.text, schema);
+  const blocks = withoutBadBlocks(merged.text, schema, options.question);
   const words = withoutInventedProse(blocks.text, schema);
   if (blocks.removed === 0 && words.removed === 0) return merged;
   const example = blocks.removed > 0 ? handbookExample(schema, [options.mainType, rootType(merged.text), rootType(first.text)]) : null;

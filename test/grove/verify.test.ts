@@ -175,6 +175,31 @@ function fakeBrain(replies: Array<string | Error>) {
   return { brain, requests };
 }
 
+describe("holding what a reply says to its own json", () => {
+  const said = (text: string, question?: string) => problemsIn(text, schema, question).map(problem => problem.text);
+
+  it("counts hearts in health points", () => {
+    const heal = (amount: number) => fenced(`{ "type": "apoli:action_on_hit", "self_action": { "type": "apoli:heal", "amount": ${amount} } }`);
+    assert.ok(said(`${heal(5)}\nit heals you 5 hearts every hit`).some(text => /"amount": 5 is 2\.5 hearts, not 5\. For 5 hearts it's "amount": 10/.test(text)));
+    assert.deepEqual(said(`${heal(4)}\nit heals you 2 hearts (4 health points)`).filter(text => /hearts/.test(text)), []);
+  });
+
+  it("holds a cooldown to the file, but not the rule for ticks", () => {
+    const key = fenced('{ "type": "apoli:action_on_key_press", "entity_action": { "type": "apoli:heal", "amount": 2 }, "cooldown": 100 }');
+    assert.ok(said(`${key}\nthe cooldown is 500 ticks, which is 5 seconds`).some(text => /a cooldown of 500 ticks, but the json has "cooldown": 100/.test(text)));
+    assert.deepEqual(said(`${key}\nit has a 5 second cooldown`).filter(text => /cooldown of/.test(text)), []);
+    assert.deepEqual(said(`${key}\nthe cooldown is in ticks (20 ticks = 1 second)`).filter(text => /cooldown of/.test(text)), []);
+  });
+
+  it("knows night is daytime turned around, when they asked for night", () => {
+    const day = fenced('{ "type": "apoli:action_on_hit", "self_action": { "type": "apoli:heal", "amount": 2 }, "condition": { "type": "apoli:daytime" } }');
+    assert.ok(said(day, "can i make a power that only works at night?").some(text => /"inverted": true/.test(text)));
+    assert.deepEqual(said(day, "can i make a power that only works during the day?").filter(text => /they asked for/.test(text)), []);
+    assert.deepEqual(said(day).filter(text => /they asked for/.test(text)), [], "without their message there's nothing to hold it to");
+    assert.equal(withoutBadBlocks(`here:\n${day}\nthat's it`, schema, "only at night please").removed, 1, "and the block goes when it still says so");
+  });
+});
+
 const request: BrainRequest = { system: "S", messages: [{ role: "user", content: "sam: make me hit things" }], maxToolRounds: 3, followThrough: () => null };
 const BAD = fenced('{ "type": "apoli:action_on_hit", "bientity_action": { "type": "apoli:heal", "amount": 2 } }');
 const INVENTED = fenced('{ "type": "apoli:spawn_butterflies" }');
