@@ -79,7 +79,7 @@ const signpost = new Signpost(chat.history, isSupportChannel);
 const gallery = new MediaGallery();
 
 client.once(Events.ClientReady, async ready => {
-  ready.user.setActivity("Overgrown's Origins", { type: ActivityType.Playing });
+  ready.user.setActivity(services.brain.online ? "Overgrown's Origins" : "Sleeping 💤", { type: ActivityType.Playing });
   try {
     await deploySlashCommands(token, ready.user.id);
   } catch (error) {
@@ -136,12 +136,7 @@ const housekeeping = setInterval(() => {
   chat.tick();
   chat.refreshPersona();
 
-  if (services.brain.online) {
-    client.user?.setActivity("Overgrown's Origins", { type: ActivityType.Playing });
-  }
-  else {
-    client.user?.setActivity("Sleeping 💤", { type: ActivityType.Playing });
-  }
+  client.user?.setActivity(services.brain.online ? "Overgrown's Origins" : "Sleeping 💤", { type: ActivityType.Playing });
 }, 60_000);
 housekeeping.unref();
 
