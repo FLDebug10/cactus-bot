@@ -135,6 +135,13 @@ process.on("unhandledRejection", error => log.error("unhandled rejection", error
 const housekeeping = setInterval(() => {
   chat.tick();
   chat.refreshPersona();
+
+  if (services.brain.online) {
+    client.user?.setActivity("Overgrown's Origins", { type: ActivityType.Playing });
+  }
+  else {
+    client.user?.setActivity("Sleeping 💤", { type: ActivityType.Playing });
+  }
 }, 60_000);
 housekeeping.unref();
 
