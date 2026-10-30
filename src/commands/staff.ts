@@ -12,22 +12,76 @@ function forumPost(message: Message) {
 }
 
 export const STAFF_COMMANDS: readonly Command[] = [
-  {
-    name: "say",
-    usage: "!say [text]",
-    description: "Makes me say something (reply to a message to answer it)",
-    staffOnly: true,
-    run: async ({ message, args }) => {
-      if (args.length === 0) return;
-      // Staff-written, so mentions behave like a person typed them.
-      const allowedMentions = { parse: ["users", "roles", "everyone"] as ("users" | "roles" | "everyone")[] };
-      const targetId = message.reference?.messageId;
-      const target = targetId !== undefined ? await message.channel.messages.fetch(targetId).catch(() => null) : null;
-      if (target !== null) await target.reply({ content: args, allowedMentions });
-      else if (message.channel.isSendable()) await message.channel.send({ content: args, allowedMentions });
+{
+  name: "say",
+  usage: "!say [time] [text]",
+  description: "Makes me say something (optional timer; reply to a message to answer it)",
+  staffOnly: true,
+  run: async ({ message, args }) => {
+    if (args.length === 0) return;
+
+    let text = args;
+    let delay = 0;
+
+    // Supported durations: 1h, 1m, 20s, 1h20m
+    const durationMatch = args.match(/^(\d+h)?(\d+m)?(\d+s)?\s+([\s\S]+)$/i);
+
+    if (durationMatch && (durationMatch[1] || durationMatch[2] || durationMatch[3])) {
+      const hours = Number.parseInt(durationMatch[1] ?? "0", 10);
+      const minutes = Number.parseInt(durationMatch[2] ?? "0", 10);
+      const seconds = Number.parseInt(durationMatch[3] ?? "0", 10);
+
+      delay = (hours * 3600 + minutes * 60 + seconds) * 1000;
+      text = durationMatch[4];
+
+      if (delay > 24 * 60 * 60 * 1000) {
+        return message.reply("❌ The maximum !say timer is 24 hours.");
+      }
+
+      if (delay <= 0) return message.reply("❌ Please provide a valid timer.");
+    }
+
+    const allowedMentions = {
+      parse: ["users", "roles", "everyone"] as ("users" | "roles" | "everyone")[],
+    };
+
+    const targetId = message.reference?.messageId;
+
+    if (delay > 0) {
       await message.delete().catch(() => undefined);
-    },
+
+      setTimeout(async () => {
+        try {
+          const target = targetId !== undefined
+            ? await message.channel.messages.fetch(targetId).catch(() => null)
+            : null;
+
+          if (target !== null) {
+            await target.reply({ content: text, allowedMentions });
+          } else if (message.channel.isSendable()) {
+            await message.channel.send({ content: text, allowedMentions });
+          }
+        } catch (error) {
+          log.error("could not send delayed say message", error);
+        }
+      }, delay);
+
+      return;
+    }
+
+    const target = targetId !== undefined
+      ? await message.channel.messages.fetch(targetId).catch(() => null)
+      : null;
+
+    if (target !== null) {
+      await target.reply({ content: text, allowedMentions });
+    } else if (message.channel.isSendable()) {
+      await message.channel.send({ content: text, allowedMentions });
+    }
+
+    await message.delete().catch(() => undefined);
   },
+},
   {
     name: "claim",
     description: "Claims a suggestion post and marks it as being handled",
