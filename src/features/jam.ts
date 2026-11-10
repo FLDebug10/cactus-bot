@@ -275,12 +275,11 @@ ${submissions.length >= 3 ? `*🥉 3rd Place*: ${submissions[2]!.user.displayNam
         let msg =
 `Hi there ${jam.role !== undefined ? `<@&${jam.role}>` : "everyone"},
 Please take some time to vote the winner of ${jam.name}! The options are:
-
-`
+\n`
 
         for (const sub of jam.submissions.values()) {
             msg +=
-`[${sub.user.displayName} – ${sub.name}](https://discord.com/channels/${this.Guild.id}/${sub.thread.id})
+`<@${sub.user.id}> – [${sub.name}](https://discord.com/channels/${this.Guild.id}/${sub.thread.id})
 `
         }
 
