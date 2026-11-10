@@ -92,7 +92,6 @@ client.once(Events.ClientReady, async ready => {
   knowledgeSync?.start(KNOWLEDGE.refreshHours);
   log.info(`online as ${ready.user.tag}`);
   const guild = await client.guilds.fetch(GUILD_ID)
-  await guild.members.fetch()
   voteSystem = await VoteSystem.create(db, guild);
 });
 
