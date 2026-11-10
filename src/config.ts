@@ -97,7 +97,7 @@ export const SETTINGS = {
 // reached, Grove still runs every command and moderation rule, it just doesn't chat.
 export const BRAIN = {
   url: env("GROVE_BRAIN_URL") ?? "http://127.0.0.1:11434",
-  model: env("GROVE_BRAIN_MODEL") ?? "qwen3.5:4b",
+  model: env("GROVE_BRAIN_MODEL") ?? "qwen2.5-coder:7b",
   // Tokens the model can see at once: persona, recent chat, handbook notes and tool results.
   contextTokens: envInt("GROVE_BRAIN_CONTEXT", 8192),
   // How long Ollama keeps the model in memory after a reply ("10m", "1h"). Unset = Ollama's default.
