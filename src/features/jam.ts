@@ -246,7 +246,10 @@ The Winners are:
 ${submissions.length >= 3 ? `*🥉 3rd Place*: ${submissions[2]!.user.displayName} – ${submissions[2]!.name} with ${submissions[2]!.voters.size} votes` : ""}`
 
         void jam.channel.send({
-            content: msg
+            content: msg,
+            allowedMentions: {
+                users: [...submissions.values()].slice(0, 3).map(sub => sub.user.id)
+            }
         }).catch(console.error)
     }
 
@@ -287,7 +290,8 @@ Please take some time to vote the winner of ${jam.name}! The options are:
             content: msg,
             components: [new ActionRowBuilder().setComponents(voteButton).toJSON()],
             allowedMentions: {
-                roles: jam.role !== undefined ? [jam.role] : []
+                roles: jam.role !== undefined ? [jam.role] : [],
+                users: [...jam.submissions.values()].map(sub => sub.user.id)
             }
         }).catch(console.error)
     }
