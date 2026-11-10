@@ -306,7 +306,7 @@ export async function handleVoteCommand(interaction: ChatInputCommandInteraction
         .addLabelComponents([
             new LabelBuilder().setLabel("Name").setDescription("Name of the Vote")
                 .setTextInputComponent(new TextInputBuilder().setCustomId("name").setRequired(true).setStyle(TextInputStyle.Short)),
-            new LabelBuilder().setLabel("Start Date").setDescription("Start date of the Vote as ISO timestamp. Voters have to have joined before this date to be able to vote. Starting the jam manually before this date moves it automatically.")
+            new LabelBuilder().setLabel("Start Date").setDescription("Start date of the Vote (ISO timestamp). Voters must join before this and it's moved on manual start.")
                 .setTextInputComponent(new TextInputBuilder().setCustomId("start_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true).setStyle(TextInputStyle.Short)),
             new LabelBuilder().setLabel("End Date").setDescription("End date of the Vote as ISO timestamp.")
                 .setTextInputComponent(new TextInputBuilder().setCustomId("end_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true).setStyle(TextInputStyle.Short)),
