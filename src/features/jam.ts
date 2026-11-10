@@ -7,7 +7,7 @@ import {
     type LabelModalData, MessageFlags, ModalBuilder, type ModalSubmitInteraction, RoleSelectMenuBuilder,
     type SelectMenuModalData, StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder, type TextBasedChannel,
-    TextInputBuilder, type TextInputModalData,
+    TextInputBuilder, type TextInputModalData, TextInputStyle,
     ThreadChannel, UserSelectMenuBuilder
 } from "discord.js";
 import {type Database} from "better-sqlite3";
@@ -66,7 +66,7 @@ export class VoteSystem {
                 console.error(`Unknown User: ${sub.user}`)
                 continue
             }
-            const thread = await this.Guild.channels.fetch(sub.thread)
+            const thread = await this.Guild.channels.fetch(sub.thread).catch(() => null)
             if (thread === null || !thread.isThread()) {
                 console.error(`Unknown Thread: ${sub.thread}`)
                 continue
@@ -305,12 +305,12 @@ export async function handleVoteCommand(interaction: ChatInputCommandInteraction
     modal.setCustomId("vote").setTitle("Vote")
         .addLabelComponents([
             new LabelBuilder().setLabel("Name").setDescription("Name of the Vote")
-                .setTextInputComponent(new TextInputBuilder().setCustomId("name").setRequired(true)),
-            new LabelBuilder().setLabel("Start Date").setDescription("Start date of the Vote as ISO timestamp. Voters have to have joined before this date to be able to vote.")
-                .setTextInputComponent(new TextInputBuilder().setCustomId("start_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true)),
+                .setTextInputComponent(new TextInputBuilder().setCustomId("name").setRequired(true).setStyle(TextInputStyle.Short)),
+            new LabelBuilder().setLabel("Start Date").setDescription("Start date of the Vote as ISO timestamp. Voters have to have joined before this date to be able to vote. Starting the jam manually before this date moves it automatically.")
+                .setTextInputComponent(new TextInputBuilder().setCustomId("start_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true).setStyle(TextInputStyle.Short)),
             new LabelBuilder().setLabel("End Date").setDescription("End date of the Vote as ISO timestamp.")
-                .setTextInputComponent(new TextInputBuilder().setCustomId("end_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true)),
-            new LabelBuilder().setLabel("Role").setDescription("Role of the roles allowed to vote, leave empty to allow everyone who joined before the start date")
+                .setTextInputComponent(new TextInputBuilder().setCustomId("end_date").setMinLength(20).setMaxLength(25).setValue("1970-01-01T00:00:00Z").setRequired(true).setStyle(TextInputStyle.Short)),
+            new LabelBuilder().setLabel("Role").setDescription("Role of the users allowed to vote, leave empty to allow everyone who joined before the start date")
                 .setRoleSelectMenuComponent(new RoleSelectMenuBuilder().setCustomId("role").setRequired(false).setMaxValues(1)),
         ])
 
@@ -408,7 +408,7 @@ export async function handleSubmissionButton(interaction: ButtonInteraction) {
             new LabelBuilder().setLabel("User").setDescription("The creator of the submission.")
                 .setUserSelectMenuComponent(new UserSelectMenuBuilder().setMinValues(1).setMaxValues(1).setRequired(true).setCustomId("user")),
             new LabelBuilder().setLabel("Name").setDescription("The name of the submission.")
-                .setTextInputComponent(new TextInputBuilder().setRequired(true).setCustomId("name")),
+                .setTextInputComponent(new TextInputBuilder().setRequired(true).setCustomId("name").setStyle(TextInputStyle.Short)),
             new LabelBuilder().setLabel("Thread").setDescription("The thread of the submission.")
                 .setChannelSelectMenuComponent(new ChannelSelectMenuBuilder().setCustomId("thread").setRequired(true).setMinValues(1).setMaxValues(1).setChannelTypes([ChannelType.PublicThread]))
         ])
@@ -465,7 +465,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
     }
 
     if(voteSystem.getVote(jam.id, interaction.user.id) !== undefined && !change) {
-        const sub = voteSystem.getVote(jam.id, interaction.id)!
+        const sub = voteSystem.getVote(jam.id, interaction.user.id)!
 
         const voteButton = new ButtonBuilder()
             .setEmoji("📩")
