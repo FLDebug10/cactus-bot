@@ -56,6 +56,32 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX IF NOT EXISTS grove_strikes_by_user ON grove_strikes (user_id, kind, at);
   `,
+  `
+  CREATE TABLE IF NOT EXISTS submissions (
+    user TEXT NOT NULL,
+    jam INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    thread TEXT NOT NULL,
+    PRIMARY KEY (user, jam),
+    FOREIGN KEY (jam) REFERENCES jams(id)
+  );
+  CREATE TABLE IF NOT EXISTS votes (
+    user TEXT NOT NULL,
+    jam INTEGER NOT NULL,
+    submission TEXT NOT NULL,
+    PRIMARY KEY (user, jam),
+    FOREIGN KEY (jam) REFERENCES jams(id),
+    FOREIGN KEY (submission, jam) REFERENCES submissions(user, jam)    
+  );
+  CREATE TABLE IF NOT EXISTS jams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    startDate INTEGER NOT NULL,
+    endDate INTEGER NOT NULL,
+    role TEXT
+  );
+  `
 ];
 
 export function openDatabase(path: string): Db {

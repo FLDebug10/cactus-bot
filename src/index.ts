@@ -3,7 +3,7 @@ import { ActivityType, ChannelType, Events, type Message } from "discord.js";
 import { commandSummary, runCommand } from "./commands/registry.ts";
 import { deploySlashCommands, handleInteraction } from "./commands/slash.ts";
 import type { Services } from "./commands/command.ts";
-import { CHANNELS, KNOWLEDGE, SETTINGS } from "./config.ts";
+import {CHANNELS, GUILD_ID, KNOWLEDGE, SETTINGS} from "./config.ts";
 import { CustomCommandStore } from "./db/customCommands.ts";
 import { openDatabase } from "./db/database.ts";
 import { StrikeStore } from "./db/strikes.ts";
@@ -18,6 +18,7 @@ import { brainsFromConfig } from "./grove/brains.ts";
 import { KnowledgeStore } from "./grove/knowledge/store.ts";
 import { KnowledgeSync } from "./grove/knowledge/sync.ts";
 import { logger } from "./logger.ts";
+import {VoteSystem} from "./features/jam.ts";
 
 const log = logger("main");
 
@@ -55,6 +56,7 @@ const isSupportChannel = (message: Message) => SUPPORT_CHANNELS.has(message.chan
 
 const modmailLinks = new ModmailLinks(db);
 const customCommands = new CustomCommandStore(db);
+let voteSystem: VoteSystem
 const chat = new GroveChat({
   client,
   brain,
@@ -89,6 +91,9 @@ client.once(Events.ClientReady, async ready => {
   brain.start();
   knowledgeSync?.start(KNOWLEDGE.refreshHours);
   log.info(`online as ${ready.user.tag}`);
+  const guild = await client.guilds.fetch(GUILD_ID)
+  await guild.members.fetch()
+  voteSystem = await VoteSystem.create(db, guild);
 });
 
 client.on(Events.ThreadCreate, (thread, newlyCreated) => {
@@ -96,7 +101,7 @@ client.on(Events.ThreadCreate, (thread, newlyCreated) => {
 });
 
 client.on(Events.InteractionCreate, interaction => {
-  void handleInteraction(interaction, customCommands);
+  void handleInteraction(interaction, customCommands, voteSystem);
 });
 
 client.on(Events.MessageCreate, message => {
@@ -137,6 +142,8 @@ const housekeeping = setInterval(() => {
   chat.refreshPersona();
 
   client.user?.setActivity(services.brain.online ? "Overgrown's Origins" : "Sleeping 💤", { type: ActivityType.Playing });
+
+  voteSystem.tick()
 }, 60_000);
 housekeeping.unref();
 

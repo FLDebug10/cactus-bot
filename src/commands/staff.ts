@@ -32,7 +32,7 @@ export const STAFF_COMMANDS: readonly Command[] = [
       const seconds = Number.parseInt(durationMatch[3] ?? "0", 10);
 
       delay = (hours * 3600 + minutes * 60 + seconds) * 1000;
-      text = durationMatch[4];
+      text = durationMatch[4]!;
 
       if (delay > 24 * 60 * 60 * 1000) {
         return message.reply("❌ The maximum !say timer is 24 hours.");
