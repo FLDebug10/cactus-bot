@@ -10,7 +10,7 @@ Discord ── Grove bot (Azure VM) ──┤
 
 | Brain                                    | Available                                            | Limit                       |
 |------------------------------------------|------------------------------------------------------|-----------------------------|
-| **local**, `qwen3.5:4b` on your PC       | while the PC is on, Ollama runs and the tunnel is up | none, only your GPU's speed |
+| **local**, `qwen2.5-coder:7b` on your PC | while the PC is on, Ollama runs and the tunnel is up | none, only your GPU's speed |
 | **cloud**, `glm-5.3-flash` on ollama.com | always (only if `GROVE_CLOUD_API_KEY` is set)        | your plan's monthly credits |
 
 Grove asks the brains in order (cloud first by default) and uses the first one that's awake. When the cloud runs out of credits or gets rate limited, it rests until the credits refill (Grove asks ollama.com every 5 minutes) and the local brain answers instead. With neither awake, Grove runs commands and moderation only, and answers people with 💤 (plus a short note at most every 15 minutes per channel).
@@ -23,8 +23,8 @@ The bot checks every 20 seconds while a brain is away (every minute while it's t
 sudo pacman -S ollama-cuda
 sudo systemctl edit ollama          # paste deploy/brain/ollama-override.conf
 sudo systemctl enable --now ollama
-ollama pull qwen3.5:4b              # a 3-4 GB download
-ollama run qwen3.5:4b "say hi"      # quick check, Ctrl+D to leave
+ollama pull qwen2.5-coder:7b        # a 4.7 GB download
+ollama run qwen2.5-coder:7b "say hi" # quick check, Ctrl+D to leave
 ```
 
 `ollama ps` should show the model at `100% GPU`. Ollama keeps listening on `127.0.0.1` only, so nothing on your network can reach it.
@@ -35,11 +35,13 @@ Local models have no usage limit at all: the only limits are your GPU's speed an
 
 | Model                      | Size            | Fits a 6 GB RTX 3060 Laptop | Notes                                                                                                                                       |
 |----------------------------|-----------------|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| **`qwen3.5:4b`** (default) | 3.3 GB          | fully on the GPU            | tool calling, vision and an optional thinking mode. Fitting entirely in VRAM is what keeps it fast                                          |
+| **`qwen2.5-coder:7b`** (default) | 4.7 GB     | fully on the GPU            | tool calling and strong at code, json and the power builder; no vision or thinking mode. Fitting entirely in VRAM is what keeps it fast        |
+| `qwen3.5:4b`               | 3.3 GB          | fully on the GPU            | tool calling, vision and an optional thinking mode; better for general chat and screenshots, weaker at code                                 |
+| `qwen2.5-coder:14b`        | 9.0 GB          | spills onto the CPU         | smarter code, but slower: the extra parameters don't fit in 6 GB VRAM                                                                      |
 | `qwen3.5:4b-mtp-q4_K_M`    | 4.1 GB          | fully on the GPU            | the same model with multi-token prediction: it guesses a few tokens ahead, so replies come faster. Set `GROVE_BRAIN_DRAFT_TOKENS=3` with it |
 | `qwen3.5:9b`               | 6.6 GB          | spills onto the CPU         | the same family, bigger: smarter but slower. Try it if replies feel too simple                                                              |
 | `gemma4:e4b-it-qat`        | 6.1 GB          | barely, spills a little     | Google's Gemma 4, an alternative to try                                                                                                     |
-| `gemma4:e2b-it-qat`        | 4.3 GB          | fully on the GPU            | smaller Gemma 4, weaker than `qwen3.5:4b`                                                                                                   |
+| `gemma4:e2b-it-qat`        | 4.3 GB          | fully on the GPU            | smaller Gemma 4, weaker than the 7B coder                                                                                                   |
 | `glm-5.3-flash`            | 320B parameters | no                          | an Ollama *cloud* model: use it as the cloud brain below. The smallest local build is ~93 GB                                                |
 | DeepSeek R1 distills       | 5-9 GB          | partly                      | reason at length before every reply, too slow for chat                                                                                      |
 
@@ -109,7 +111,7 @@ services:
       - ./data:/app/data
 ```
 
-Nothing has to be added to `.env`: the defaults point at `http://127.0.0.1:11434` and `qwen3.5:4b`. See the settings table in the README to change them.
+Nothing has to be added to `.env`: the defaults point at `http://127.0.0.1:11434` and `qwen2.5-coder:7b`. See the settings table in the README to change them.
 
 Grove also needs these Discord permissions for the new moderation: **Moderate Members** (to time out people who keep asking explicit questions) and **Add Reactions** (the 💤).
 
