@@ -50,6 +50,7 @@ export class VoteSystem {
     static async create(db: Database, guild: Guild): Promise<VoteSystem> {
         const instance = new VoteSystem(db, guild);
         await instance.loadSubmissions(db);
+        console.log("Voting System Initialized")
         return instance;
     }
 
