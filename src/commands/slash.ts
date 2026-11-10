@@ -41,7 +41,6 @@ const DEFINITIONS = [
   new SlashCommandBuilder()
       .setName("vote")
       .setDescription("Starts a Vote in this Channel")
-      .addIntegerOption(option => option.setName("submissions").setDescription("Amount of submissions").setRequired(true).setMinValue(2))
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 ];
 
