@@ -8,7 +8,7 @@ import {
     type SelectMenuModalData, StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder, type TextBasedChannel,
     TextInputBuilder, type TextInputModalData, TextInputStyle,
-    ThreadChannel, UserSelectMenuBuilder
+    ThreadChannel, UserSelectMenuBuilder, ButtonStyle
 } from "discord.js";
 import {type Database} from "better-sqlite3";
 
@@ -270,6 +270,7 @@ ${submissions.length >= 3 ? `*🥉 3rd Place*: ${submissions[2]!.user.displayNam
             .setEmoji("📩")
             .setLabel("Vote!")
             .setCustomId("submission_vote")
+            .setStyle(ButtonStyle.Primary)
 
         let msg =
 `Hi there ${jam.role !== undefined ? `<@&${jam.role}>` : "everyone"},
@@ -346,21 +347,25 @@ export async function handleVoteModal(interaction: ModalSubmitInteraction, voteS
         .setEmoji("➕")
         .setCustomId("add_submission")
         .setLabel("Add Submission")
+        .setStyle(ButtonStyle.Primary)
 
     const startVote = new ButtonBuilder()
         .setEmoji("✔️")
         .setCustomId("start_vote")
         .setLabel("Start Vote")
+        .setStyle(ButtonStyle.Success)
 
     const endVote = new ButtonBuilder()
         .setEmoji("❌")
         .setCustomId("end_vote")
         .setLabel("End Vote")
+        .setStyle(ButtonStyle.Danger)
 
     const cancelVote = new ButtonBuilder()
         .setEmoji("⛔")
         .setCustomId("cancel_vote")
         .setLabel("Cancel Vote")
+        .setStyle(ButtonStyle.Danger)
 
     await interaction.reply({
         content: "Created the vote successfully, press the buttons below to add submissions, start the vote or end the vote.",
@@ -471,6 +476,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
             .setEmoji("📩")
             .setLabel("Change Vote")
             .setCustomId("submission_vote_change")
+            .setStyle(ButtonStyle.Primary)
 
         await interaction.reply({
             content: `You have already voted. You voted for: ${sub.user.displayName} – ${sub.name}`,
@@ -510,6 +516,7 @@ export async function handleVoteSubmissionModal(interaction: ModalSubmitInteract
         .setEmoji("📩")
         .setLabel("Change Vote")
         .setCustomId("submission_vote_change")
+        .setStyle(ButtonStyle.Primary)
 
     await interaction.reply({
         content: `You voted for ${voteSystem.getSubmission(jam.id, user)?.name} by ${voteSystem.getSubmission(jam.id, user)?.user.displayName}!`,
