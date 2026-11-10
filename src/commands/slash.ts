@@ -94,9 +94,9 @@ export async function handleInteraction(interaction: Interaction, store: CustomC
       else if (interaction.commandName === "vote") await handleVoteCommand(interaction)
     } else if (interaction.isModalSubmit()) {
       if(interaction.customId === REGISTER_MODAL) await saveRegistration(interaction, store);
-      else if(interaction.customId === "vote") await handleVoteModal(interaction, voteSystem)
+      else if(interaction.customId === "vote_modal") await handleVoteModal(interaction, voteSystem)
       else if(interaction.customId === "submission") await handleSubmissionModal(interaction, voteSystem)
-      else if(interaction.customId === "submission_vote") await handleVoteSubmissionModal(interaction, voteSystem)
+      else if(interaction.customId === "submission_vote_modal") await handleVoteSubmissionModal(interaction, voteSystem)
     } else if (interaction.isButton()) {
       if (interaction.customId === "add_submission") await handleSubmissionButton(interaction)
       else if(interaction.customId === "end_vote") await handleEndJamButton(interaction, voteSystem, false)

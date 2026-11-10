@@ -302,7 +302,7 @@ Please take some time to vote the winner of ${jam.name}! The options are:
 
 export async function handleVoteCommand(interaction: ChatInputCommandInteraction) {
     const modal = new ModalBuilder()
-    modal.setCustomId("vote").setTitle("Vote")
+    modal.setCustomId("vote_modal").setTitle("Vote")
         .addLabelComponents([
             new LabelBuilder().setLabel("Name").setDescription("Name of the Vote")
                 .setTextInputComponent(new TextInputBuilder().setCustomId("name").setRequired(true).setStyle(TextInputStyle.Short)),
@@ -480,7 +480,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
         return
     }
 
-    const modal = new ModalBuilder().setCustomId("submission_vote").setTitle(jam.name)
+    const modal = new ModalBuilder().setCustomId("submission_vote_modal").setTitle(jam.name)
     const component = new StringSelectMenuBuilder().setMinValues(1).setMaxValues(1).setRequired(true).setCustomId("vote")
 
     for (const sub of jam.submissions.values()) {
