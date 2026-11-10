@@ -56,7 +56,7 @@ const isSupportChannel = (message: Message) => SUPPORT_CHANNELS.has(message.chan
 
 const modmailLinks = new ModmailLinks(db);
 const customCommands = new CustomCommandStore(db);
-let voteSystem: VoteSystem
+let voteSystem: VoteSystem | undefined
 const chat = new GroveChat({
   client,
   brain,
@@ -101,7 +101,7 @@ client.on(Events.ThreadCreate, (thread, newlyCreated) => {
 });
 
 client.on(Events.InteractionCreate, interaction => {
-  void handleInteraction(interaction, customCommands, voteSystem);
+  if (voteSystem !== undefined) void handleInteraction(interaction, customCommands, voteSystem);
 });
 
 client.on(Events.MessageCreate, message => {
@@ -143,7 +143,7 @@ const housekeeping = setInterval(() => {
 
   client.user?.setActivity(services.brain.online ? "Overgrown's Origins" : "Sleeping 💤", { type: ActivityType.Playing });
 
-  voteSystem.tick()
+  if (voteSystem !== undefined) voteSystem.tick()
 }, 60_000);
 housekeeping.unref();
 
