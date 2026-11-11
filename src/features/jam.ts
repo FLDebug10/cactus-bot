@@ -261,7 +261,6 @@ ${submissions.length >= 3 ? `*🥉 3rd Place*: ${submissions[2]!.user.displayNam
             }
         }).catch(console.error)
     }
-
     public startJam(): string | undefined {
         if((this.getJam(this.newestJam)?.submissions.size ?? 0) < 2) return "Couldn't start the vote, you need at least 2 submissions. There are: " + (this.getJam(this.newestJam)?.submissions.size)
         if(this.activeJam === this.newestJam) return "Couldn't start the vote, the vote is already going."
@@ -466,14 +465,15 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
         return
     }
     const jam = voteSystem.getJam(voteSystem.getActiveJam()!)
-    if (jam === undefined || interaction.member === null) {
+    const member = await interaction.guild?.members.fetch(interaction.user.id)
+    if (jam === undefined || member === undefined) {
         await interaction.reply({
             content: "Something went wrong while voting, try again later. If the issue persists please DM Grove about it!",
             flags: MessageFlags.Ephemeral
         })
         return
     }
-    if (!jam.canVote(interaction.member as GuildMember)) {
+    if (!jam.canVote(member)) {
         await interaction.reply({
             content: "You are not allowed to vote for this!",
             flags: MessageFlags.Ephemeral
