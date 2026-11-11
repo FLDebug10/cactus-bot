@@ -465,7 +465,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
         return
     }
     const jam = voteSystem.getJam(voteSystem.getActiveJam()!)
-    const member = await interaction.guild?.members.fetch(interaction.user.id)
+    const member = await interaction.guild?.members.fetch(interaction.user.id).catch(() => undefined)
     if (jam === undefined || member === undefined) {
         await interaction.reply({
             content: "Something went wrong while voting, try again later. If the issue persists please DM Grove about it!",
@@ -528,7 +528,7 @@ export async function handleVoteSubmissionModal(interaction: ModalSubmitInteract
             content: "You can't vote for yourself!",
             flags: MessageFlags.Ephemeral
         })
-        case 0: return void await interaction.reply({
+        case 1: return void await interaction.reply({
             content: "Something went wrong while voting, try again later. If the issue persists please DM Grove about it!",
             flags: MessageFlags.Ephemeral
         })
