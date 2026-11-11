@@ -19,7 +19,7 @@ import {
   handleSubmissionButton,
   handleSubmissionModal, handleVoteButton,
   handleVoteCommand,
-  handleVoteModal, handleVoteSubmissionModal,
+  handleVoteModal, handleVotePanel, handleVoteSubmissionModal,
   VoteSystem
 } from "../features/jam.ts";
 
@@ -45,6 +45,10 @@ const DEFINITIONS = [
   new SlashCommandBuilder()
       .setName("query_votes")
       .setDescription("Queries the votes for the current Vote")
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder()
+      .setName("vote_panel")
+      .setDescription("Sends another management panel for the current vote (in case you lost the original one)")
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 ];
 
@@ -97,6 +101,7 @@ export async function handleInteraction(interaction: Interaction, store: CustomC
       else if (interaction.commandName === "unregister") await unregister(interaction, store);
       else if (interaction.commandName === "vote") await handleVoteCommand(interaction)
       else if (interaction.commandName === "query_votes") await handleQueryCommand(interaction, voteSystem)
+      else if (interaction.commandName === "vote_panel") await handleVotePanel(interaction, false)
     } else if (interaction.isModalSubmit()) {
       if(interaction.customId === REGISTER_MODAL) await saveRegistration(interaction, store);
       else if(interaction.customId === "vote_modal") await handleVoteModal(interaction, voteSystem)

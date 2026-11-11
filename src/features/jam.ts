@@ -8,7 +8,7 @@ import {
     type SelectMenuModalData, StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder, type TextBasedChannel,
     TextInputBuilder, type TextInputModalData, TextInputStyle,
-    ThreadChannel, UserSelectMenuBuilder, ButtonStyle
+    ThreadChannel, UserSelectMenuBuilder, ButtonStyle, type RepliableInteraction
 } from "discord.js";
 import {type Database} from "better-sqlite3";
 
@@ -354,6 +354,10 @@ export async function handleVoteModal(interaction: ModalSubmitInteraction, voteS
 
     voteSystem.addJam(interaction.channel, name, startDate, endDate, role)
 
+    await handleVotePanel(interaction, true)
+}
+
+export async function handleVotePanel(interaction: RepliableInteraction, creation: boolean) {
     const submission = new ButtonBuilder()
         .setEmoji("➕")
         .setCustomId("add_submission")
@@ -379,7 +383,7 @@ export async function handleVoteModal(interaction: ModalSubmitInteraction, voteS
         .setStyle(ButtonStyle.Danger)
 
     await interaction.reply({
-        content: "Created the vote successfully, press the buttons below to add submissions, start the vote or end the vote.",
+        content: creation ? "Created the vote successfully, press the buttons below to add submissions, start the vote or end the vote." : "Here's a new panel to manage the current vote!",
         components: [new ActionRowBuilder().setComponents([submission, startVote, endVote, cancelVote]).toJSON()],
         flags: MessageFlags.Ephemeral
     })
