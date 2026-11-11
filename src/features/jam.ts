@@ -466,7 +466,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
         return
     }
     const jam = voteSystem.getJam(voteSystem.getActiveJam()!)
-    if (jam === undefined) {
+    if (jam === undefined || interaction.member === null) {
         await interaction.reply({
             content: "Something went wrong while voting, try again later. If the issue persists please DM Grove about it!",
             flags: MessageFlags.Ephemeral
