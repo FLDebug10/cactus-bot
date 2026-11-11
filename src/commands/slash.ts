@@ -43,7 +43,7 @@ const DEFINITIONS = [
       .setDescription("Starts a Vote in this Channel")
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
   new SlashCommandBuilder()
-      .setName("query votes")
+      .setName("query_votes")
       .setDescription("Queries the votes for the current Vote")
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 ];
@@ -96,7 +96,7 @@ export async function handleInteraction(interaction: Interaction, store: CustomC
       if (interaction.commandName === "register") await showRegisterModal(interaction);
       else if (interaction.commandName === "unregister") await unregister(interaction, store);
       else if (interaction.commandName === "vote") await handleVoteCommand(interaction)
-      else if (interaction.commandName === "query votes") await handleQueryCommand(interaction, voteSystem)
+      else if (interaction.commandName === "query_votes") await handleQueryCommand(interaction, voteSystem)
     } else if (interaction.isModalSubmit()) {
       if(interaction.customId === REGISTER_MODAL) await saveRegistration(interaction, store);
       else if(interaction.customId === "vote_modal") await handleVoteModal(interaction, voteSystem)
