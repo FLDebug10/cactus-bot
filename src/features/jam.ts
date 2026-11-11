@@ -250,8 +250,8 @@ export class VoteSystem {
 `The vote for the winner of ${jam.name} has concluded. Thanks for voting!
 There were a total of ${this.Votes.get(jam.id)?.size} Voters.
 The Winners are:
-**🥇 1st Place**: ${submissions[0]!.user.displayName} – ${submissions[0]!.name} with ${submissions[0]!.voters.size} votes
-🥈 2nd Place: ${submissions[1]!.user.displayName} – ${submissions[1]!.name} with ${submissions[1]!.voters.size} votes
+**🥇 1st Place**: ${submissions[0]?.user?.displayName} – ${submissions[0]!.name} with ${submissions[0]!.voters.size} votes
+🥈 2nd Place: ${submissions[1]?.user?.displayName} – ${submissions[1]!.name} with ${submissions[1]!.voters.size} votes
 ${submissions.length >= 3 ? `*🥉 3rd Place*: ${submissions[2]!.user.displayName} – ${submissions[2]!.name} with ${submissions[2]!.voters.size} votes` : ""}`
 
         void jam.channel.send({
