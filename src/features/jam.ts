@@ -118,32 +118,39 @@ export class VoteSystem {
 
     }
 
-    public setVote(jamId: number, user: string, submission: string) {
+    public getVoteCount(jam: number) {
+        return this.Votes.get(jam)!.size
+    }
+
+    public setVote(jamId: number, user: string, submission: string): Number {
+        if(submission === user) return 2
+
         const jam = this.Jams.get(jamId)
         const votes = this.Votes.get(jamId)
         if (votes === undefined || jam === undefined) {
             console.error(`Unknown Jam: ${jamId}`)
-            return
+            return 1
         }
         const userObj = this.Guild.members.cache.get(user)
         if (userObj === undefined) {
             console.error(`Unknown User: ${user}`)
-            return
-        }
-        if (!jam.canVote(userObj)) {
-            console.error(`Can't vote: ${user}`)
-            return
+            return 1
         }
         const target = jam.submissions.get(submission)
         if (target === undefined) {
             console.error(`Unknown Submission: ${jamId}@${submission}`)
-            return
+            return 1
+        }
+
+        if (!jam.canVote(userObj)) {
+            console.error(`Can't vote: ${user}`)
+            return 3
         }
 
         const current = votes.get(user)
 
         if (current === submission) {
-            return
+            return 1
         }
 
         this.upsertVoter.run([user, jamId, submission])
@@ -154,6 +161,8 @@ export class VoteSystem {
 
         target.voters.add(user)
         votes.set(user, submission)
+
+        return 0
     }
     public getVote(jamId: number, user: string): Submission | undefined {
         const jam = this.Jams.get(jamId)
@@ -493,6 +502,7 @@ export async function handleVoteButton(interaction: ButtonInteraction, voteSyste
     const component = new StringSelectMenuBuilder().setMinValues(1).setMaxValues(1).setRequired(true).setCustomId("vote")
 
     for (const sub of jam.submissions.values()) {
+        if (sub.user.id === interaction.user.id) continue
         component.addOptions(new StringSelectMenuOptionBuilder().setLabel(`${sub.user.displayName} – ${sub.name}`.substring(0, 100)).setValue(sub.user.id))
     }
 
@@ -513,7 +523,20 @@ export async function handleVoteSubmissionModal(interaction: ModalSubmitInteract
         return
     }
 
-    voteSystem.setVote(jam.id, interaction.user.id, user)
+    switch(voteSystem.setVote(jam.id, interaction.user.id, user)) {
+        case 2: return void await interaction.reply({
+            content: "You can't vote for yourself!",
+            flags: MessageFlags.Ephemeral
+        })
+        case 0: return void await interaction.reply({
+            content: "Something went wrong while voting, try again later. If the issue persists please DM Grove about it!",
+            flags: MessageFlags.Ephemeral
+        })
+        case 3: return void await interaction.reply({
+            content: "You're not allowed to vote!",
+            flags: MessageFlags.Ephemeral
+        })
+    }
 
     const voteButton = new ButtonBuilder()
         .setEmoji("📩")
@@ -525,5 +548,29 @@ export async function handleVoteSubmissionModal(interaction: ModalSubmitInteract
         content: `You voted for ${voteSystem.getSubmission(jam.id, user)?.name} by ${voteSystem.getSubmission(jam.id, user)?.user.displayName}!`,
         flags: MessageFlags.Ephemeral,
         components: [new ActionRowBuilder().setComponents(voteButton).toJSON()]
+    })
+}
+
+export async function handleQueryCommand(interaction: ChatInputCommandInteraction, voteSystem: VoteSystem) {
+    if (voteSystem.getActiveJam() === undefined) return void await interaction.reply({
+        content: "There isn't an active vote right now.",
+        flags: MessageFlags.Ephemeral
+    })
+
+    const jam = voteSystem.getJam(voteSystem.getActiveJam()!)!
+
+    const submissions = [...jam.submissions.values()].sort((a, b) => b.voters.size - a.voters.size)
+
+    let message =
+`There is a total of ${voteSystem.getVoteCount(jam.id)} Votes. They are distributed as follows:
+
+`
+    for (const sub of submissions) {
+        message += `${sub.user.displayName} – ${sub.name} with ${sub.voters.size} votes\n`
+    }
+
+    await interaction.reply({
+        content: message,
+        flags: MessageFlags.Ephemeral
     })
 }
