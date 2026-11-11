@@ -122,7 +122,7 @@ export class VoteSystem {
         return this.Votes.get(jam)!.size
     }
 
-    public setVote(jamId: number, user: string, submission: string): Number {
+    public async setVote(jamId: number, user: string, submission: string): Promise<Number> {
         if(submission === user) return 2
 
         const jam = this.Jams.get(jamId)
@@ -131,8 +131,8 @@ export class VoteSystem {
             console.error(`Unknown Jam: ${jamId}`)
             return 1
         }
-        const userObj = this.Guild.members.cache.get(user)
-        if (userObj === undefined) {
+        const userObj = await this.Guild.members.fetch(user).catch(() => null)
+        if (userObj === null) {
             console.error(`Unknown User: ${user}`)
             return 1
         }
@@ -523,7 +523,7 @@ export async function handleVoteSubmissionModal(interaction: ModalSubmitInteract
         return
     }
 
-    switch(voteSystem.setVote(jam.id, interaction.user.id, user)) {
+    switch(await voteSystem.setVote(jam.id, interaction.user.id, user)) {
         case 2: return void await interaction.reply({
             content: "You can't vote for yourself!",
             flags: MessageFlags.Ephemeral
