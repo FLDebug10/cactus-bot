@@ -51,10 +51,9 @@ function decodeHtml(value: string): string {
 function htmlToText(html: string): string {
   return decodeHtml(
     html
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-      .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, " ")
-      .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, " ")
+      .replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<(nav|footer|header|aside)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<button\b[^>]*>[\s\S]*?<\/button>/gi, " ")
       .replace(/<[^>]+>/g, " "),
   ).replace(/\s+/g, " ").trim();
 }
@@ -76,12 +75,8 @@ function normalizeHandbookUrl(rawUrl: string, baseUrl: string): string | null {
 }
 
 function extractPageContent(html: string): string {
-  const content =
-    html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ??
-    html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1] ??
-    html;
-
-  return content;
+  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? html;
+  return main.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1] ?? main;
 }
 
 async function fetchHandbookPage(
@@ -105,9 +100,12 @@ async function fetchHandbookPage(
     const contentHtml = extractPageContent(html);
     const rawTitle =
       contentHtml.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
+      html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1] ??
       html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ??
       "";
-    const title = htmlToText(rawTitle).replace(/\s*[|–-]\s*Handbook\s*$/i, "").trim();
+    const title = htmlToText(rawTitle)
+      .replace(/\s*[|–-]\s*(Overgrown\s*)?Handbook\s*$/i, "")
+      .trim();
 
     if (!title) {
       console.warn(`[Handbook Search] No page title found at ${url}`);
@@ -115,8 +113,8 @@ async function fetchHandbookPage(
     }
 
     const content = htmlToText(contentHtml);
-    if (!content) {
-      console.warn(`[Handbook Search] No readable content found at ${url}`);
+    if (content.length < 40) {
+      console.warn(`[Handbook Search] Insufficient article content at ${url}`);
       return null;
     }
 
@@ -226,43 +224,110 @@ async function getHandbookIndex(): Promise<HandbookPage[]> {
   return handbookIndexPromise;
 }
 
+const SEARCH_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "been", "being", "but",
+  "by", "can", "could", "do", "does", "for", "from", "get", "give",
+  "how", "i", "if", "in", "into", "is", "it", "make", "me", "my",
+  "of", "on", "or", "please", "player", "the", "their", "then", "this",
+  "to", "use", "using", "what", "when", "where", "which", "with", "would",
+]);
+
 function normalizeSearch(value: string): string[] {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9:_-]+/g, " ")
     .trim()
     .split(/\s+/)
-    .filter(word => word.length > 1)
+    .filter(word => word.length > 1 && !SEARCH_STOP_WORDS.has(word))
     .map(word => word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word);
 }
 
+function getSearchSnippet(content: string, terms: string[], maxLength = 420): string {
+  const lower = content.toLowerCase();
+  const occurrences = terms.flatMap(term => {
+    const positions: number[] = [];
+    let from = 0;
+    while (term && (from = lower.indexOf(term.toLowerCase(), from)) !== -1) {
+      positions.push(from);
+      from += term.length;
+    }
+    return positions.map(position => ({ term, position }));
+  });
+
+  if (occurrences.length === 0) {
+    return content.slice(0, maxLength) + (content.length > maxLength ? "…" : "");
+  }
+
+  let bestStart = Math.max(0, occurrences[0].position - 100);
+  let bestCount = -1;
+  for (const occurrence of occurrences) {
+    const start = Math.max(0, occurrence.position - 100);
+    const end = start + maxLength;
+    const count = new Set(
+      occurrences
+        .filter(item => item.position >= start && item.position < end)
+        .map(item => item.term),
+    ).size;
+    if (count > bestCount) {
+      bestCount = count;
+      bestStart = start;
+    }
+  }
+
+  const end = Math.min(content.length, bestStart + maxLength);
+  return `${bestStart > 0 ? "…" : ""}${content.slice(bestStart, end).trim()}${end < content.length ? "…" : ""}`;
+}
+
 function searchHandbook(pages: HandbookPage[], query: string): HandbookPage[] {
-  const terms = normalizeSearch(query);
+  const terms = [...new Set(normalizeSearch(query))];
   if (terms.length === 0) return [];
 
-  const normalizedQuery = terms.join(" ");
+  const rawQuery = query.toLowerCase().trim();
+  const isIdentifierSearch = /[_:]/.test(rawQuery) || /[a-z]+[A-Z][a-zA-Z]*/.test(query);
 
-  return pages
-    .map(page => {
-      const title = normalizeSearch(page.title).join(" ");
-      const content = normalizeSearch(page.content).join(" ");
-      let score = 0;
+  const ranked = pages.map(page => {
+    const titleTerms = normalizeSearch(page.title);
+    const contentTerms = normalizeSearch(page.content);
+    const titleSet = new Set(titleTerms);
+    const contentSet = new Set(contentTerms);
+    const titleText = titleTerms.join(" ");
+    const contentText = contentTerms.join(" ");
+    const matchedTitle = terms.filter(term => titleSet.has(term));
+    const matchedContent = terms.filter(term => contentSet.has(term));
+    const allInTitle = terms.every(term => titleSet.has(term));
+    const allInContent = terms.every(term => contentSet.has(term));
+    const exactPhraseInTitle = titleText.includes(terms.join(" "));
+    const exactPhraseInContent = contentText.includes(terms.join(" "));
 
-      if (title === normalizedQuery) score += 30;
-      if (title.includes(normalizedQuery)) score += 20;
+    const allAcrossPage = terms.every(term => titleSet.has(term) || contentSet.has(term));
+    if (terms.length > 1 && !allAcrossPage && !exactPhraseInTitle) {
+      return { page, score: 0 };
+    }
 
-      for (const term of terms) {
-        if (title.includes(term)) score += 8;
-        if (content.includes(term)) score += 2;
-      }
+    let score = 0;
+    if (titleText === terms.join(" ")) score += 100;
+    if (exactPhraseInTitle) score += 65;
+    if (allInTitle) score += 45;
+    score += matchedTitle.length * 18;
+    score += matchedContent.length * 4;
+    if (allInContent || allAcrossPage) score += 25;
+    if (exactPhraseInContent) score += 20;
 
-      if (terms.every(term => title.includes(term))) score += 15;
-      else if (terms.every(term => content.includes(term))) score += 5;
+    if (isIdentifierSearch) {
+      const identifier = rawQuery.replace(/[^a-z0-9:_-]/g, "");
+      const titleRaw = page.title.toLowerCase().replace(/[^a-z0-9:_-]/g, "");
+      const contentRaw = page.content.toLowerCase().replace(/[^a-z0-9:_-]/g, "");
+      if (titleRaw.includes(identifier)) score += 120;
+      else if (contentRaw.includes(identifier)) score += 35;
+    }
 
-      return { page, score };
-    })
-    .filter(result => result.score > 0)
-    .sort((a, b) => b.score - a.score)
+    if (page.content.length > 12000 && matchedTitle.length === 0) score -= 8;
+    return { page, score };
+  });
+
+  return ranked
+    .filter(result => result.score >= (terms.length > 1 ? 25 : 4))
+    .sort((a, b) => b.score - a.score || a.page.title.localeCompare(b.page.title))
     .slice(0, 5)
     .map(result => result.page);
 }
@@ -355,11 +420,11 @@ Use JSON Checker to quickly validate your code and spot syntax mistakes:
           .setDescription(`Results for **${query}**`);
 
         for (const page of results) {
-          const description = page.content.slice(0, 500);
+          const description = getSearchSnippet(page.content, normalizeSearch(query));
 
           embed.addFields({
-            name: page.title,
-            value: `${description}${page.content.length > 500 ? "..." : ""}\n\n[View documentation](${page.url})`,
+            name: page.title.slice(0, 256),
+            value: `${description}\n\n[View documentation](${page.url})`,
           });
         }
 
