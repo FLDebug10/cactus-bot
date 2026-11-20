@@ -87,7 +87,7 @@ The new location is:
 The locations for badge sprites are:
 
 \`"sprite": "origins:textures/gui/badge/silent/folder/badge.png"\`
-
+-# and
 \`"sprite": "origins:textures/gui/badge/isaacfanta/badge.png"\``,
       embeds: [
         new EmbedBuilder().setImage("attachment://badges.png"),
