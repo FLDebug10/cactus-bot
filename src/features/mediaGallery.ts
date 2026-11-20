@@ -10,6 +10,8 @@ const MEDIA_FILE = /\.(png|jpe?g|gif|webp|bmp|avif|heic|tiff?|mp4|mov|webm|mkv|a
 // Reaction GIFs are chatter, not something you made.
 const REACTION_GIF_HOST = /(^|\.)(tenor\.com|giphy\.com)$/i;
 // Discord builds link previews a moment after the message arrives.
+const MEDAL_HOST = /(^|\.)medal\.tv$/i;
+// Medal clips count as media, even when Discord doesn't provide a video preview.
 const PREVIEW_WAIT_MS = 3_500;
 const NOTICE_LIFETIME_MS = 30_000;
 const NOTICE_COOLDOWN_MS = 2 * 60_000;
@@ -23,16 +25,23 @@ export function attachmentIsMedia(attachment: Pick<Attachment, "contentType" | "
 export function embedIsMedia(embed: Pick<Embed, "url" | "image" | "video" | "thumbnail">): boolean {
   if (embed.url !== null) {
     try {
-      if (REACTION_GIF_HOST.test(new URL(embed.url).hostname)) return false;
+      const hostname = new URL(embed.url).hostname;
+
+      if (REACTION_GIF_HOST.test(hostname)) return false;
+      if (MEDAL_HOST.test(hostname)) return true;
     } catch {
       return false;
     }
   }
+
   return embed.image !== null || embed.video !== null || embed.thumbnail !== null;
 }
 
 function showsMedia(message: Message): boolean {
-  return message.attachments.some(attachmentIsMedia) || message.embeds.some(embedIsMedia);
+  if (message.attachments.some(attachmentIsMedia)) return true;
+  if (message.embeds.some(embedIsMedia)) return true;
+
+  return /https?:\/\/(?:www\.)?medal\.tv\/(?:games\/[^/\s]+\/clips|clips)\//i.test(message.content);
 }
 
 // The media gallery is a no-talk zone: posts are screenshots and videos, and
