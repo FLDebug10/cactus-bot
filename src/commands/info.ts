@@ -236,7 +236,7 @@ function searchHandbook(
     .map(result => result.page);
 }
 
-// Standard Commands
+// Info Commands
 
 export const INFO_COMMANDS: readonly Command[] = [
   {
