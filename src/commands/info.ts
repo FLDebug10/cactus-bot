@@ -16,8 +16,17 @@ interface HandbookPage {
 }
 
 const HANDBOOK_BASE = "https://0vergrown.github.io/Handbook/";
+const HANDBOOK_HOST = "https://0vergrown.github.io";
+const HANDBOOK_DOCS_PATH = "/Handbook/docs/";
 const HANDBOOK_CACHE_MS = 30 * 60 * 1000;
 const HANDBOOK_MAX_PAGES = 180;
+const HANDBOOK_CONCURRENCY = 8;
+
+const HANDBOOK_START_PAGES = [
+  `${HANDBOOK_BASE}docs/datapack/introduction/overview/`,
+  `${HANDBOOK_BASE}docs/addon/introduction/overview/`,
+  `${HANDBOOK_BASE}docs/compat/introduction/overview/`,
+];
 
 let handbookCache: HandbookPage[] = [];
 let handbookCacheTime = 0;
@@ -31,12 +40,12 @@ function decodeHtml(value: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, code: string) =>
-      String.fromCodePoint(Number(code)),
-    )
-    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
-      String.fromCodePoint(parseInt(code, 16)),
-    );
+    .replace(/&#(\d+);/g, (_, code: string) => {
+      try { return String.fromCodePoint(Number(code)); } catch { return " "; }
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => {
+      try { return String.fromCodePoint(parseInt(code, 16)); } catch { return " "; }
+    });
 }
 
 function htmlToText(html: string): string {
@@ -50,18 +59,29 @@ function htmlToText(html: string): string {
   ).replace(/\s+/g, " ").trim();
 }
 
-function normalizeSearch(value: string): string[] {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9:_-]+/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(word => word.length > 1)
-    .map(word =>
-      word.length > 4 && word.endsWith("s")
-        ? word.slice(0, -1)
-        : word,
-    );
+function normalizeHandbookUrl(rawUrl: string, baseUrl: string): string | null {
+  try {
+    const url = new URL(decodeHtml(rawUrl), baseUrl);
+    url.hash = "";
+    url.search = "";
+
+    if (url.protocol !== "https:" || url.origin !== HANDBOOK_HOST) return null;
+    if (!url.pathname.startsWith(HANDBOOK_DOCS_PATH)) return null;
+
+    if (!url.pathname.endsWith("/")) url.pathname += "/";
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function extractPageContent(html: string): string {
+  const content =
+    html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ??
+    html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1] ??
+    html;
+
+  return content;
 }
 
 async function fetchHandbookPage(
@@ -69,106 +89,117 @@ async function fetchHandbookPage(
 ): Promise<{ page: HandbookPage; links: string[] } | null> {
   try {
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
       headers: {
-        "User-Agent": "CactusBot-HandbookSearch/1.0",
+        "User-Agent": "CactusBot-HandbookSearch/1.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn(`[Handbook Search] HTTP ${response.status} for ${url}`);
+      return null;
+    }
 
     const html = await response.text();
-    const main =
-      html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? html;
+    const contentHtml = extractPageContent(html);
+    const rawTitle =
+      contentHtml.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
+      html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ??
+      "";
+    const title = htmlToText(rawTitle).replace(/\s*[|–-]\s*Handbook\s*$/i, "").trim();
 
-    const title = decodeHtml(
-      main
-        .match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
-        ?.replace(/<[^>]+>/g, "")
-        .trim() ?? "",
-    );
+    if (!title) {
+      console.warn(`[Handbook Search] No page title found at ${url}`);
+      return null;
+    }
 
-    if (!title) return null;
-
-    const content = htmlToText(main);
+    const content = htmlToText(contentHtml);
+    if (!content) {
+      console.warn(`[Handbook Search] No readable content found at ${url}`);
+      return null;
+    }
 
     const links = [...html.matchAll(/href=["']([^"']+)["']/gi)]
-      .map(match => {
-        try {
-          const link = new URL(decodeHtml(match[1]), url);
-
-          link.hash = "";
-          link.search = "";
-
-          if (
-            link.origin !== "https://0vergrown.github.io" ||
-            !link.pathname.startsWith("/Handbook/docs/")
-          ) {
-            return null;
-          }
-
-          return link.href.endsWith("/")
-            ? link.href
-            : `${link.href}/`;
-        } catch {
-          return null;
-        }
-      })
+      .map(match => normalizeHandbookUrl(match[1], url))
       .filter((link): link is string => link !== null);
 
-    return {
-      page: { title, url, content },
-      links,
-    };
-  } catch {
+    return { page: { title, url, content }, links };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Handbook Search] Failed to fetch ${url}: ${message}`);
     return null;
   }
 }
 
-async function buildHandbookIndex(): Promise<HandbookPage[]> {
-  const queue = [
-    `${HANDBOOK_BASE}docs/datapack/`,
-    `${HANDBOOK_BASE}docs/addon/`,
-    `${HANDBOOK_BASE}docs/compatibility/`,
-  ];
+async function fetchHandbookSitemap(): Promise<string[]> {
+  const sitemapUrl = `${HANDBOOK_BASE}sitemap.xml`;
 
+  try {
+    const response = await fetch(sitemapUrl, {
+      signal: AbortSignal.timeout(15000),
+      headers: { "User-Agent": "CactusBot-HandbookSearch/1.1" },
+    });
+
+    if (!response.ok) {
+      console.warn(`[Handbook Search] Sitemap returned HTTP ${response.status}`);
+      return [];
+    }
+
+    const xml = await response.text();
+    return [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
+      .map(match => normalizeHandbookUrl(match[1], HANDBOOK_BASE))
+      .filter((url): url is string => url !== null);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Handbook Search] Sitemap request failed: ${message}`);
+    return [];
+  }
+}
+
+async function buildHandbookIndex(): Promise<HandbookPage[]> {
+  const sitemapPages = await fetchHandbookSitemap();
+  const queue = [...new Set([...sitemapPages, ...HANDBOOK_START_PAGES])];
+  const queued = new Set(queue);
   const visited = new Set<string>();
   const pages: HandbookPage[] = [];
 
   while (queue.length > 0 && visited.size < HANDBOOK_MAX_PAGES) {
-    const batch = queue.splice(0, 8)
-      .filter(url => !visited.has(url));
+    const batch: string[] = [];
 
-    if (batch.length === 0) break;
-
-    for (const url of batch) {
+    while (queue.length > 0 && batch.length < HANDBOOK_CONCURRENCY) {
+      const url = queue.shift()!;
+      if (visited.has(url)) continue;
       visited.add(url);
+      batch.push(url);
     }
 
-    const results = await Promise.all(
-      batch.map(fetchHandbookPage),
-    );
+    if (batch.length === 0) continue;
+
+    const results = await Promise.all(batch.map(fetchHandbookPage));
 
     for (const result of results) {
       if (!result) continue;
-
       pages.push(result.page);
 
-      for (const link of result.links) {
-        if (
-          !visited.has(link) &&
-          queue.length + visited.size < HANDBOOK_MAX_PAGES * 2
-        ) {
-          queue.push(link);
+      if (sitemapPages.length === 0) {
+        for (const link of result.links) {
+          if (!visited.has(link) && !queued.has(link) && queue.length + visited.size < HANDBOOK_MAX_PAGES) {
+            queued.add(link);
+            queue.push(link);
+          }
         }
       }
     }
   }
 
   if (pages.length === 0) {
-    throw new Error("Could not retrieve handbook documentation.");
+    throw new Error(
+      "Could not retrieve any Handbook pages. Check the preceding [Handbook Search] warnings for HTTP, timeout, or network details.",
+    );
   }
 
+  console.log(`[Handbook Search] Indexed ${pages.length} documentation pages.`);
   return pages;
 }
 
@@ -180,9 +211,7 @@ async function getHandbookIndex(): Promise<HandbookPage[]> {
     return handbookCache;
   }
 
-  if (handbookIndexPromise) {
-    return handbookIndexPromise;
-  }
+  if (handbookIndexPromise) return handbookIndexPromise;
 
   handbookIndexPromise = buildHandbookIndex()
     .then(pages => {
@@ -197,12 +226,18 @@ async function getHandbookIndex(): Promise<HandbookPage[]> {
   return handbookIndexPromise;
 }
 
-function searchHandbook(
-  pages: HandbookPage[],
-  query: string,
-): HandbookPage[] {
-  const terms = normalizeSearch(query);
+function normalizeSearch(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(word => word.length > 1)
+    .map(word => word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word);
+}
 
+function searchHandbook(pages: HandbookPage[], query: string): HandbookPage[] {
+  const terms = normalizeSearch(query);
   if (terms.length === 0) return [];
 
   const normalizedQuery = terms.join(" ");
@@ -211,7 +246,6 @@ function searchHandbook(
     .map(page => {
       const title = normalizeSearch(page.title).join(" ");
       const content = normalizeSearch(page.content).join(" ");
-
       let score = 0;
 
       if (title === normalizedQuery) score += 30;
@@ -222,11 +256,8 @@ function searchHandbook(
         if (content.includes(term)) score += 2;
       }
 
-      if (terms.every(term => title.includes(term))) {
-        score += 15;
-      } else if (terms.every(term => content.includes(term))) {
-        score += 5;
-      }
+      if (terms.every(term => title.includes(term))) score += 15;
+      else if (terms.every(term => content.includes(term))) score += 5;
 
       return { page, score };
     })
