@@ -78,12 +78,25 @@ The new location is:
       files: [new AttachmentBuilder(asset("bars.png"), { name: "bars.png" })],
     }),
   },
-  {
+    {
     name: "badges",
-    description: "Shows how to use badges",
+    description: "Shows how to use badges and their sprite locations",
     run: context => answer(context, {
-      embeds: [new EmbedBuilder().setImage("attachment://badges.png")],
-      files: [new AttachmentBuilder(asset("badges.png"), { name: "badges.png" })],
+      content: `**Badge Sprite Locations**
+
+The locations for badge sprites are:
+
+\`"sprite": "origins:textures/gui/badge/silent/folder/badge.png"\`
+
+\`"sprite": "origins:textures/gui/badge/isaacfanta/badge.png"\``,
+      embeds: [
+        new EmbedBuilder().setImage("attachment://badges.png"),
+        new EmbedBuilder().setImage("attachment://badges2.png"),
+      ],
+      files: [
+        new AttachmentBuilder(asset("badges.png"), { name: "badges.png" }),
+        new AttachmentBuilder(asset("badges2.png"), { name: "badges2.png" }),
+      ],
     }),
   },
   {
