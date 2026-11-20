@@ -19,13 +19,35 @@ const HANDBOOK_BASE = "https://0vergrown.github.io/Handbook/";
 const HANDBOOK_HOST = "https://0vergrown.github.io";
 const HANDBOOK_DOCS_PATH = "/Handbook/docs/";
 const HANDBOOK_CACHE_MS = 30 * 60 * 1000;
-const HANDBOOK_MAX_PAGES = 180;
+const HANDBOOK_MAX_PAGES = 1000;
 const HANDBOOK_CONCURRENCY = 8;
 
 const HANDBOOK_START_PAGES = [
   `${HANDBOOK_BASE}docs/datapack/introduction/overview/`,
+  `${HANDBOOK_BASE}docs/datapack/introduction/actions/`,
+  `${HANDBOOK_BASE}docs/datapack/introduction/conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/introduction/powers/`,
+  `${HANDBOOK_BASE}docs/datapack/powers/`,
+  `${HANDBOOK_BASE}docs/datapack/data-types/`,
+
+  `${HANDBOOK_BASE}docs/datapack/entity-actions/`,
+  `${HANDBOOK_BASE}docs/datapack/bientity-actions/`,
+  `${HANDBOOK_BASE}docs/datapack/block-actions/`,
+  `${HANDBOOK_BASE}docs/datapack/item-actions/`,
+  `${HANDBOOK_BASE}docs/datapack/meta-actions/`,
+
+  `${HANDBOOK_BASE}docs/datapack/entity-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/bientity-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/block-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/item-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/damage-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/biome-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/fluid-conditions/`,
+  `${HANDBOOK_BASE}docs/datapack/meta-conditions/`,
+
+  `${HANDBOOK_BASE}docs/datapack/origins/`,
   `${HANDBOOK_BASE}docs/addon/introduction/overview/`,
-  `${HANDBOOK_BASE}docs/compat/introduction/overview/`,
+  `${HANDBOOK_BASE}docs/compatibility/introduction/overview/`,
 ];
 
 let handbookCache: HandbookPage[] = [];
@@ -130,42 +152,17 @@ async function fetchHandbookPage(
   }
 }
 
-async function fetchHandbookSitemap(): Promise<string[]> {
-  const sitemapUrl = `${HANDBOOK_BASE}sitemap.xml`;
-
-  try {
-    const response = await fetch(sitemapUrl, {
-      signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": "CactusBot-HandbookSearch/1.1" },
-    });
-
-    if (!response.ok) {
-      console.warn(`[Handbook Search] Sitemap returned HTTP ${response.status}`);
-      return [];
-    }
-
-    const xml = await response.text();
-    return [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
-      .map(match => normalizeHandbookUrl(match[1], HANDBOOK_BASE))
-      .filter((url): url is string => url !== null);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[Handbook Search] Sitemap request failed: ${message}`);
-    return [];
-  }
-}
-
 async function buildHandbookIndex(): Promise<HandbookPage[]> {
-  const sitemapPages = await fetchHandbookSitemap();
-  const queue = [...new Set([...sitemapPages, ...HANDBOOK_START_PAGES])];
+  const queue = [...new Set(HANDBOOK_START_PAGES)];
   const queued = new Set(queue);
   const visited = new Set<string>();
-  const pages: HandbookPage[] = [];
+  const pagesByUrl = new Map<string, HandbookPage>();
+  let failedPages = 0;
 
   while (queue.length > 0 && visited.size < HANDBOOK_MAX_PAGES) {
     const batch: string[] = [];
 
-    while (queue.length > 0 && batch.length < HANDBOOK_CONCURRENCY) {
+    while (queue.length > 0 && batch.length < HANDBOOK_CONCURRENCY && visited.size < HANDBOOK_MAX_PAGES) {
       const url = queue.shift()!;
       if (visited.has(url)) continue;
       visited.add(url);
@@ -176,28 +173,66 @@ async function buildHandbookIndex(): Promise<HandbookPage[]> {
 
     const results = await Promise.all(batch.map(fetchHandbookPage));
 
-    for (const result of results) {
-      if (!result) continue;
-      pages.push(result.page);
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (!result) {
+        failedPages++;
+        continue;
+      }
 
-      if (sitemapPages.length === 0) {
-        for (const link of result.links) {
-          if (!visited.has(link) && !queued.has(link) && queue.length + visited.size < HANDBOOK_MAX_PAGES) {
-            queued.add(link);
-            queue.push(link);
-          }
+      pagesByUrl.set(result.page.url, result.page);
+
+      for (const link of result.links) {
+        if (
+          !visited.has(link) &&
+          !queued.has(link) &&
+          visited.size + queue.length < HANDBOOK_MAX_PAGES
+        ) {
+          queued.add(link);
+          queue.push(link);
         }
       }
     }
   }
 
+  const pages = [...pagesByUrl.values()];
   if (pages.length === 0) {
     throw new Error(
       "Could not retrieve any Handbook pages. Check the preceding [Handbook Search] warnings for HTTP, timeout, or network details.",
     );
   }
 
-  console.log(`[Handbook Search] Indexed ${pages.length} documentation pages.`);
+  const entityGlow = pages.find(page =>
+    page.title.toLowerCase() === "entity glow" || page.url.toLowerCase().includes("entity_glow"),
+  );
+  if (!entityGlow) {
+    console.warn(
+      "[Handbook Search] Entity Glow was not indexed. Check whether the Powers index links to its page and whether its request failed.",
+    );
+  }
+
+  const categoryTitles = [
+    "Powers", "Entity Actions", "Bi-Entity Actions", "Block Actions",
+    "Item Actions", "Meta-Actions", "Entity Conditions",
+    "Bi-Entity Conditions", "Block Conditions", "Item Conditions",
+    "Damage Conditions", "Biome Conditions", "Fluid Conditions",
+    "Meta-Conditions", "Data Types",
+  ];
+  const foundCategories = categoryTitles.filter(title =>
+    pages.some(page => page.title.toLowerCase() === title.toLowerCase()),
+  );
+
+  console.log(
+    `[Handbook Search] Indexed ${pages.length} documentation pages; discovered ${visited.size} URLs; ${failedPages} fetches failed; found ${foundCategories.length}/${categoryTitles.length} reference indexes.`,
+  );
+  console.log(`[Handbook Search] Reference indexes found: ${foundCategories.join(", ") || "none"}`);
+
+  if (visited.size >= HANDBOOK_MAX_PAGES && queue.length > 0) {
+    console.warn(
+      `[Handbook Search] Page limit reached (${HANDBOOK_MAX_PAGES}); ${queue.length} discovered URLs were not fetched.`,
+    );
+  }
+
   return pages;
 }
 
@@ -233,13 +268,26 @@ const SEARCH_STOP_WORDS = new Set([
 ]);
 
 function normalizeSearch(value: string): string[] {
-  return value
+  const words = value
     .toLowerCase()
-    .replace(/[^a-z0-9:_-]+/g, " ")
+    .replace(/[^a-z0-9:_]+/g, " ")
     .trim()
     .split(/\s+/)
-    .filter(word => word.length > 1 && !SEARCH_STOP_WORDS.has(word))
-    .map(word => word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word);
+    .filter(word => word.length > 1 && !SEARCH_STOP_WORDS.has(word));
+
+  const normalized: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] === "bi" && words[i + 1] === "entity") {
+      normalized.push("bientity");
+      i++;
+      continue;
+    }
+
+    const word = words[i];
+    normalized.push(word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word);
+  }
+
+  return normalized;
 }
 
 function getSearchSnippet(content: string, terms: string[], maxLength = 420): string {
