@@ -1,3 +1,4 @@
+
 import { AttachmentBuilder, EmbedBuilder } from "discord.js";
 import { fileURLToPath } from "node:url";
 import { CHANNELS, LINKS } from "../config.ts";
@@ -5,6 +6,237 @@ import { MEDIA_RULES } from "../texts.ts";
 import { answer, type Command } from "./command.ts";
 
 const asset = (name: string) => fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
+
+// Handbook Search
+
+interface HandbookPage {
+  title: string;
+  url: string;
+  content: string;
+}
+
+const HANDBOOK_BASE = "https://0vergrown.github.io/Handbook/";
+const HANDBOOK_CACHE_MS = 30 * 60 * 1000;
+const HANDBOOK_MAX_PAGES = 180;
+
+let handbookCache: HandbookPage[] = [];
+let handbookCacheTime = 0;
+let handbookIndexPromise: Promise<HandbookPage[]> | null = null;
+
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, code: string) =>
+      String.fromCodePoint(Number(code)),
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
+      String.fromCodePoint(parseInt(code, 16)),
+    );
+}
+
+function htmlToText(html: string): string {
+  return decodeHtml(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, " ")
+      .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  ).replace(/\s+/g, " ").trim();
+}
+
+function normalizeSearch(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(word => word.length > 1)
+    .map(word =>
+      word.length > 4 && word.endsWith("s")
+        ? word.slice(0, -1)
+        : word,
+    );
+}
+
+async function fetchHandbookPage(
+  url: string,
+): Promise<{ page: HandbookPage; links: string[] } | null> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        "User-Agent": "CactusBot-HandbookSearch/1.0",
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const main =
+      html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? html;
+
+    const title = decodeHtml(
+      main
+        .match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
+        ?.replace(/<[^>]+>/g, "")
+        .trim() ?? "",
+    );
+
+    if (!title) return null;
+
+    const content = htmlToText(main);
+
+    const links = [...html.matchAll(/href=["']([^"']+)["']/gi)]
+      .map(match => {
+        try {
+          const link = new URL(decodeHtml(match[1]), url);
+
+          link.hash = "";
+          link.search = "";
+
+          if (
+            link.origin !== "https://0vergrown.github.io" ||
+            !link.pathname.startsWith("/Handbook/docs/")
+          ) {
+            return null;
+          }
+
+          return link.href.endsWith("/")
+            ? link.href
+            : `${link.href}/`;
+        } catch {
+          return null;
+        }
+      })
+      .filter((link): link is string => link !== null);
+
+    return {
+      page: { title, url, content },
+      links,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function buildHandbookIndex(): Promise<HandbookPage[]> {
+  const queue = [
+    `${HANDBOOK_BASE}docs/datapack/`,
+    `${HANDBOOK_BASE}docs/addon/`,
+    `${HANDBOOK_BASE}docs/compatibility/`,
+  ];
+
+  const visited = new Set<string>();
+  const pages: HandbookPage[] = [];
+
+  while (queue.length > 0 && visited.size < HANDBOOK_MAX_PAGES) {
+    const batch = queue.splice(0, 8)
+      .filter(url => !visited.has(url));
+
+    if (batch.length === 0) break;
+
+    for (const url of batch) {
+      visited.add(url);
+    }
+
+    const results = await Promise.all(
+      batch.map(fetchHandbookPage),
+    );
+
+    for (const result of results) {
+      if (!result) continue;
+
+      pages.push(result.page);
+
+      for (const link of result.links) {
+        if (
+          !visited.has(link) &&
+          queue.length + visited.size < HANDBOOK_MAX_PAGES * 2
+        ) {
+          queue.push(link);
+        }
+      }
+    }
+  }
+
+  if (pages.length === 0) {
+    throw new Error("Could not retrieve handbook documentation.");
+  }
+
+  return pages;
+}
+
+async function getHandbookIndex(): Promise<HandbookPage[]> {
+  if (
+    handbookCache.length > 0 &&
+    Date.now() - handbookCacheTime < HANDBOOK_CACHE_MS
+  ) {
+    return handbookCache;
+  }
+
+  if (handbookIndexPromise) {
+    return handbookIndexPromise;
+  }
+
+  handbookIndexPromise = buildHandbookIndex()
+    .then(pages => {
+      handbookCache = pages;
+      handbookCacheTime = Date.now();
+      return pages;
+    })
+    .finally(() => {
+      handbookIndexPromise = null;
+    });
+
+  return handbookIndexPromise;
+}
+
+function searchHandbook(
+  pages: HandbookPage[],
+  query: string,
+): HandbookPage[] {
+  const terms = normalizeSearch(query);
+
+  if (terms.length === 0) return [];
+
+  const normalizedQuery = terms.join(" ");
+
+  return pages
+    .map(page => {
+      const title = normalizeSearch(page.title).join(" ");
+      const content = normalizeSearch(page.content).join(" ");
+
+      let score = 0;
+
+      if (title === normalizedQuery) score += 30;
+      if (title.includes(normalizedQuery)) score += 20;
+
+      for (const term of terms) {
+        if (title.includes(term)) score += 8;
+        if (content.includes(term)) score += 2;
+      }
+
+      if (terms.every(term => title.includes(term))) {
+        score += 15;
+      } else if (terms.every(term => content.includes(term))) {
+        score += 5;
+      }
+
+      return { page, score };
+    })
+    .filter(result => result.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(result => result.page);
+}
+
+// Standard Commands
 
 export const INFO_COMMANDS: readonly Command[] = [
   {
@@ -63,8 +295,57 @@ Use JSON Checker to quickly validate your code and spot syntax mistakes:
   {
     name: "handbook",
     aliases: ["wiki"],
-    description: "Sends the Overgrown Handbook link",
-    run: context => answer(context, `📘 **Overgrown Handbook**\n${LINKS.datapackDocs}`),
+    usage: "!wiki [subject]",
+    description: "Searches the Overgrown Handbook",
+    run: async context => {
+      const query = context.args.trim();
+
+      if (!query) {
+        return answer(
+          context,
+          `📘 **Overgrown Handbook**\n${LINKS.datapackDocs}`,
+        );
+      }
+
+      try {
+        const pages = await getHandbookIndex();
+        const results = searchHandbook(pages, query);
+
+        if (results.length === 0) {
+          return answer(
+            context,
+            `🔎 No handbook results found for **${query}**.\nTry different keywords or browse the handbook:\n${LINKS.datapackDocs}`,
+          );
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0x5865F2)
+          .setTitle("📘 Handbook Search")
+          .setDescription(`Results for **${query}**`);
+
+        for (const page of results) {
+          const description = page.content.slice(0, 500);
+
+          embed.addFields({
+            name: page.title,
+            value: `${description}${page.content.length > 500 ? "..." : ""}\n\n[View documentation](${page.url})`,
+          });
+        }
+
+        embed.setFooter({
+          text: `${results.length} result${results.length === 1 ? "" : "s"} found`,
+        });
+
+        return answer(context, { embeds: [embed] });
+      } catch (error) {
+        console.error("[Handbook Search]", error);
+
+        return answer(
+          context,
+          `⚠️ I couldn't retrieve the handbook right now. Please try again later.\n${LINKS.datapackDocs}`,
+        );
+      }
+    },
   },
   {
     name: "bars",
@@ -78,7 +359,7 @@ The new location is:
       files: [new AttachmentBuilder(asset("bars.png"), { name: "bars.png" })],
     }),
   },
-    {
+  {
     name: "badges",
     description: "Shows how to use badges and their sprite locations",
     run: context => answer(context, {
