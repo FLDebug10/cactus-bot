@@ -20,7 +20,15 @@ export const BRAIN_COMMANDS: readonly Command[] = [
     description: "Shows whether my chatting brain is awake",
     run: async ({ message, args, services }) => {
       if (args.trim().toLowerCase() === "sync") {
-        if (!isStaff(message.member)) return message.r
+        if (!isStaff(message.member)) return message.reply("only staff can make me re-read everything!");
+        if (services.knowledgeSync === null) return message.reply("i don't have a library to read, sorry!");
+        await message.reply("okay! re-reading the handbook and the mods' code, give me a minute 📚");
+        const results = await services.knowledgeSync.syncAll(true);
+        const lines = results.map(result => result.status === "failed" ? `- ${result.source}: couldn't (${result.error ?? "unknown"})` : `- ${result.source}: ${result.files ?? 0} files, ${result.chunks ?? 0} pieces`);
+        return message.reply(`done!\n${lines.join("\n")}`);
+      }
+
+      const statuses = await services.brain.check();
       const now = Date.now();
       const active = services.brain.active;
       const lines = [
