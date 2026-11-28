@@ -399,6 +399,19 @@ This helps keep bug reports organized and makes it easier to track and address i
 This helps avoid clutter in channels used for discussion and chatting with others.`),
   },
   {
+    name: "rule9",
+    description: "Explains Rule 9: Encourage Learning, Not Handouts",
+    run: context => answer(context, `**Rule 9 — Encourage Learning, Not Handouts**
+
+When helping others develop their datapacks, do not simply create powers for them. Instead, guide them through the process by explaining the relevant mechanics, demonstrating examples, and teaching them how to implement their ideas themselves.
+
+Simply making powers for others goes against the purpose of this community, as it removes the learning experience and bypasses the process of understanding how datapack development works, particularly for those with little or no experience.
+
+**Explain, demonstrate, and teach. Don't just do it for them.**
+
+The goal is to help developers become more confident and independent, not reliant on others to create their content.`),
+  },
+  {
     name: "ras",
     description: "Redirect addon support",
     run: context => answer(context, `Please use <#${CHANNELS.addonSupport}> for help with making Java addons for Apoli and Origins.
